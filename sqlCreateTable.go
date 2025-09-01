@@ -1,6 +1,6 @@
 package geostore
 
-import "github.com/gouniverse/sb"
+import "github.com/dracory/sb"
 
 // SQLCreateTable returns a SQL string for creating the country table
 func (st *Store) sqlCountryTableCreate() string {

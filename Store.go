@@ -1,12 +1,14 @@
 package geostore
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log"
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/dracory/database"
 	"github.com/dracory/sb"
 	"github.com/dromara/carbon/v2"
 	"github.com/samber/lo"
@@ -99,7 +101,7 @@ func (st *Store) EnableDebug(debug bool) {
 	st.debugEnabled = debug
 }
 
-func (store *Store) CountryCreate(country *Country) error {
+func (store *Store) CountryCreate(ctx context.Context, country *Country) error {
 	country.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 	country.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
@@ -119,7 +121,7 @@ func (store *Store) CountryCreate(country *Country) error {
 		log.Println(sqlStr)
 	}
 
-	_, err := store.db.Exec(sqlStr, params...)
+	_, err := store.db.ExecContext(ctx, sqlStr, params...)
 
 	if err != nil {
 		return err
@@ -130,15 +132,15 @@ func (store *Store) CountryCreate(country *Country) error {
 	return nil
 }
 
-func (store *Store) CountryDelete(country *Country) error {
+func (store *Store) CountryDelete(ctx context.Context, country *Country) error {
 	if country == nil {
 		return errors.New("country is nil")
 	}
 
-	return store.CountryDeleteByID(country.ID())
+	return store.CountryDeleteByID(ctx, country.ID())
 }
 
-func (store *Store) CountryDeleteByID(id string) error {
+func (store *Store) CountryDeleteByID(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("country id is empty")
 	}
@@ -157,17 +159,17 @@ func (store *Store) CountryDeleteByID(id string) error {
 		log.Println(sqlStr)
 	}
 
-	_, err := store.db.Exec(sqlStr, params...)
+	_, err := store.db.ExecContext(ctx, sqlStr, params...)
 
 	return err
 }
 
-func (store *Store) CountryFindByID(id string) (*Country, error) {
+func (store *Store) CountryFindByID(ctx context.Context, id string) (*Country, error) {
 	if id == "" {
 		return nil, errors.New("country id is empty")
 	}
 
-	list, err := store.CountryList(CountryQueryOptions{
+	list, err := store.CountryList(ctx, CountryQueryOptions{
 		ID:    id,
 		Limit: 1,
 	})
@@ -183,12 +185,12 @@ func (store *Store) CountryFindByID(id string) (*Country, error) {
 	return nil, nil
 }
 
-func (store *Store) CountryFindByIso2(iso2Code string) (*Country, error) {
+func (store *Store) CountryFindByIso2(ctx context.Context, iso2Code string) (*Country, error) {
 	if iso2Code == "" {
 		return nil, errors.New("country iso2 code is empty")
 	}
 
-	list, err := store.CountryList(CountryQueryOptions{
+	list, err := store.CountryList(ctx, CountryQueryOptions{
 		Status: COUNTRY_STATUS_ACTIVE,
 		Iso2:   iso2Code,
 		Limit:  1,
@@ -205,8 +207,8 @@ func (store *Store) CountryFindByIso2(iso2Code string) (*Country, error) {
 	return nil, nil
 }
 
-func (store *Store) CountryNameFindByIso2(iso2Code string) (string, error) {
-	country, err := store.CountryFindByIso2(iso2Code)
+func (store *Store) CountryNameFindByIso2(ctx context.Context, iso2Code string) (string, error) {
+	country, err := store.CountryFindByIso2(ctx, iso2Code)
 
 	if err != nil {
 		return "", err
@@ -219,10 +221,10 @@ func (store *Store) CountryNameFindByIso2(iso2Code string) (string, error) {
 	return country.Name(), nil
 }
 
-func (store *Store) CountryList(options CountryQueryOptions) ([]Country, error) {
+func (store *Store) CountryList(ctx context.Context, options CountryQueryOptions) ([]Country, error) {
 	q := store.countryQuery(options)
 
-	sqlStr, _, errSql := q.Select().ToSQL()
+	sqlStr, params, errSql := q.Select().ToSQL()
 
 	if errSql != nil {
 		return []Country{}, nil
@@ -232,8 +234,7 @@ func (store *Store) CountryList(options CountryQueryOptions) ([]Country, error) 
 		log.Println(sqlStr)
 	}
 
-	db := sb.NewDatabase(store.db, store.dbDriverName)
-	modelMaps, err := db.SelectToMapString(sqlStr)
+	modelMaps, err := database.SelectToMapString(database.NewQueryableContext(ctx, store.db), sqlStr, params...)
 	if err != nil {
 		return []Country{}, err
 	}
@@ -248,27 +249,27 @@ func (store *Store) CountryList(options CountryQueryOptions) ([]Country, error) 
 	return list, nil
 }
 
-func (store *Store) CountrySoftDelete(country *Country) error {
+func (store *Store) CountrySoftDelete(ctx context.Context, country *Country) error {
 	if country == nil {
 		return errors.New("country is nil")
 	}
 
 	country.SetDeletedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
-	return store.CountryUpdate(country)
+	return store.CountryUpdate(ctx, country)
 }
 
-func (store *Store) CountrySoftDeleteByID(id string) error {
-	country, err := store.CountryFindByID(id)
+func (store *Store) CountrySoftDeleteByID(ctx context.Context, id string) error {
+	country, err := store.CountryFindByID(ctx, id)
 
 	if err != nil {
 		return err
 	}
 
-	return store.CountrySoftDelete(country)
+	return store.CountrySoftDelete(ctx, country)
 }
 
-func (store *Store) CountryUpdate(country *Country) error {
+func (store *Store) CountryUpdate(ctx context.Context, country *Country) error {
 	if country == nil {
 		return errors.New("country is nil")
 	}
@@ -300,7 +301,7 @@ func (store *Store) CountryUpdate(country *Country) error {
 		log.Println(sqlStr)
 	}
 
-	_, err := store.db.Exec(sqlStr, params...)
+	_, err := store.db.ExecContext(ctx, sqlStr, params...)
 
 	country.MarkAsNotDirty()
 
@@ -442,10 +443,10 @@ func (store *Store) StatesCreate(states []*State) error {
 	return nil
 }
 
-func (store *Store) StateList(options StateQueryOptions) ([]State, error) {
+func (store *Store) StateList(ctx context.Context, options StateQueryOptions) ([]State, error) {
 	q := store.stateQuery(options)
 
-	sqlStr, _, errSql := q.Select().ToSQL()
+	sqlStr, params, errSql := q.Select().ToSQL()
 
 	if errSql != nil {
 		return []State{}, nil
@@ -455,8 +456,7 @@ func (store *Store) StateList(options StateQueryOptions) ([]State, error) {
 		log.Println(sqlStr)
 	}
 
-	db := sb.NewDatabase(store.db, store.dbDriverName)
-	modelMaps, err := db.SelectToMapString(sqlStr)
+	modelMaps, err := database.SelectToMapString(database.NewQueryableContext(ctx, store.db), sqlStr, params...)
 	if err != nil {
 		return []State{}, err
 	}
@@ -524,7 +524,7 @@ func (store *Store) stateQuery(options StateQueryOptions) *goqu.SelectDataset {
 	return q
 }
 
-func (store *Store) TimezoneCreate(timezone *Timezone) error {
+func (store *Store) TimezoneCreate(ctx context.Context, timezone *Timezone) error {
 	timezone.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 	timezone.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
@@ -555,7 +555,7 @@ func (store *Store) TimezoneCreate(timezone *Timezone) error {
 	return nil
 }
 
-func (store *Store) TimezoneList(options TimezoneQueryOptions) ([]Timezone, error) {
+func (store *Store) TimezoneList(ctx context.Context, options TimezoneQueryOptions) ([]Timezone, error) {
 	q := store.timezoneQuery(options)
 
 	sqlStr, _, errSql := q.Select().ToSQL()
@@ -568,8 +568,7 @@ func (store *Store) TimezoneList(options TimezoneQueryOptions) ([]Timezone, erro
 		log.Println(sqlStr)
 	}
 
-	db := sb.NewDatabase(store.db, store.dbDriverName)
-	modelMaps, err := db.SelectToMapString(sqlStr)
+	modelMaps, err := database.SelectToMapString(database.NewQueryableContext(ctx, store.db), sqlStr)
 	if err != nil {
 		return []Timezone{}, err
 	}

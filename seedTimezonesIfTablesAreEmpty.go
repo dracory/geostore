@@ -1,5 +1,7 @@
 package geostore
 
+import "context"
+
 var timezones = []map[string]string{
 	{
 		"CountryCode": "AF",
@@ -2979,7 +2981,8 @@ var timezones = []map[string]string{
 }
 
 func (store *Store) seedTimezonesIfTableEmpty() error {
-	list, err := store.TimezoneList(TimezoneQueryOptions{
+	ctx := context.Background()
+	list, err := store.TimezoneList(ctx, TimezoneQueryOptions{
 		Limit: 1,
 	})
 
@@ -2999,7 +3002,7 @@ func (store *Store) seedTimezonesIfTableEmpty() error {
 		timezone.SetGlobalName(entry["GlobalName"])
 		timezone.SetOffset(entry["GtmOffset"])
 
-		err = store.TimezoneCreate(timezone)
+		err = store.TimezoneCreate(context.Background(), timezone)
 
 		if err != nil {
 			return err

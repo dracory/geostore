@@ -1,5 +1,7 @@
 package geostore
 
+import "context"
+
 var countries = []map[string]string{
 
 	{
@@ -1706,7 +1708,8 @@ var countries = []map[string]string{
 }
 
 func (store *Store) seedCountriesIfTableIsEmpty() error {
-	list, err := store.CountryList(CountryQueryOptions{
+	ctx := context.Background()
+	list, err := store.CountryList(ctx, CountryQueryOptions{
 		Limit: 1,
 	})
 
@@ -1726,7 +1729,7 @@ func (store *Store) seedCountriesIfTableIsEmpty() error {
 		country.SetContinent(entry["Continent"])
 		country.SetPhonePrefix(entry["Prefix"])
 
-		err = store.CountryCreate(country)
+		err = store.CountryCreate(context.Background(), country)
 
 		if err != nil {
 			return err

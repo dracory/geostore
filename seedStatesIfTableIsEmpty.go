@@ -1,6 +1,7 @@
 package geostore
 
 import (
+	"context"
 	"encoding/csv"
 	"strings"
 )
@@ -5096,7 +5097,8 @@ id,name,country_id,country_code,country_name,state_code,type,latitude,longitude
 `
 
 func (store *Store) seedStatesIfTableEmpty() error {
-	list, err := store.StateList(StateQueryOptions{
+	ctx := context.Background()
+	list, err := store.StateList(ctx, StateQueryOptions{
 		Limit: 1,
 	})
 

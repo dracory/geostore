@@ -3,8 +3,8 @@ package geostore
 import "github.com/dracory/sb"
 
 // SQLCreateTable returns a SQL string for creating the country table
-func (st *Store) sqlCountryTableCreate() string {
-	sql := sb.NewBuilder(st.dbDriverName).
+func (st *Store) sqlCountryTableCreate() (string, error) {
+	sql, err := sb.NewBuilder(st.dbDriverName).
 		Table(st.countryTableName).
 		Column(sb.Column{
 			Name:       COLUMN_ID,
@@ -56,11 +56,11 @@ func (st *Store) sqlCountryTableCreate() string {
 		}).
 		CreateIfNotExists()
 
-	return sql
+	return sql, err
 }
 
-func (st *Store) sqlStateTableCreate() string {
-	sql := sb.NewBuilder(st.dbDriverName).
+func (st *Store) sqlStateTableCreate() (string, error) {
+	sql, err := sb.NewBuilder(st.dbDriverName).
 		Table(st.stateTableName).
 		Column(sb.Column{
 			Name:       COLUMN_ID,
@@ -102,11 +102,11 @@ func (st *Store) sqlStateTableCreate() string {
 		}).
 		CreateIfNotExists()
 
-	return sql
+	return sql, err
 }
 
-func (st *Store) sqlTimezoneTableCreate() string {
-	sql := sb.NewBuilder(st.dbDriverName).
+func (st *Store) sqlTimezoneTableCreate() (string, error) {
+	sql, err := sb.NewBuilder(st.dbDriverName).
 		Table(st.timezoneTableName).
 		Column(sb.Column{
 			Name:       COLUMN_ID,
@@ -158,5 +158,5 @@ func (st *Store) sqlTimezoneTableCreate() string {
 		}).
 		CreateIfNotExists()
 
-	return sql
+	return sql, err
 }

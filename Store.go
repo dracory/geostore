@@ -31,20 +31,28 @@ type Store struct {
 // AutoMigrate auto migrate
 func (store *Store) AutoMigrate() error {
 	// create country table
-	sql := store.sqlCountryTableCreate()
+	sql, err := store.sqlCountryTableCreate()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
 	if sql == "" {
 		return errors.New("country table create sql is empty")
 	}
 
-	_, err := store.db.Exec(sql)
+	_, err = store.db.Exec(sql)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
 	// create state table
-	sql = store.sqlStateTableCreate()
+	sql, err = store.sqlStateTableCreate()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
 	if sql == "" {
 		return errors.New("state table create sql is empty")
@@ -57,7 +65,11 @@ func (store *Store) AutoMigrate() error {
 	}
 
 	// create timezone table
-	sql = store.sqlTimezoneTableCreate()
+	sql, err = store.sqlTimezoneTableCreate()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
 	if sql == "" {
 		return errors.New("timezone table create sql is empty")

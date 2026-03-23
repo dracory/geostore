@@ -22,3 +22,4 @@ go.work
 
 # Any DB files (used for testing)
 *.db
+coverage

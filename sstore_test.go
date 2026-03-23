@@ -26,75 +26,25 @@ func initDB() *sql.DB {
 	return db
 }
 
-// setupTestDB initializes a test database with the required tables
-func setupTestDB(t *testing.T, db *sql.DB, tablePrefix string) {
+// setupTestDB initializes a test database using the sb package for table creation
+func setupTestDB(t *testing.T, store *Store) {
 	t.Helper()
 
-	// Create country table
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS ` + tablePrefix + `_country (
-			id VARCHAR(40) PRIMARY KEY,
-			status VARCHAR(20),
-			iso2_code VARCHAR(2),
-			iso3_code VARCHAR(3),
-			name VARCHAR(255),
-			continent VARCHAR(100),
-			phone_prefix VARCHAR(20),
-			created_at DATETIME,
-			updated_at DATETIME,
-			deleted_at DATETIME
-		);
-	`)
+	err := store.AutoMigrate()
 	if err != nil {
-		t.Fatalf("Failed to create country table: %v", err)
-	}
-
-	// Create state table
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS ` + tablePrefix + `_state (
-			id VARCHAR(40) PRIMARY KEY,
-			status VARCHAR(20),
-			country_code VARCHAR(2),
-			state_code VARCHAR(5),
-			name VARCHAR(255),
-			created_at DATETIME,
-			updated_at DATETIME,
-			deleted_at DATETIME
-		);
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create state table: %v", err)
-	}
-
-	// Create timezone table
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS ` + tablePrefix + `_timezone (
-			id VARCHAR(40) PRIMARY KEY,
-			country_code VARCHAR(2),
-			zone_name VARCHAR(100),
-			global_name VARCHAR(100),
-			time_zone VARCHAR(100),
-			gtm_offset VARCHAR(20),
-			created_at DATETIME,
-			updated_at DATETIME,
-			deleted_at DATETIME
-		);
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create timezone table: %v", err)
+		t.Fatalf("Failed to auto-migrate tables: %v", err)
 	}
 }
 
 func TestStoreCountryCreate(t *testing.T) {
 	db := initDB()
-	setupTestDB(t, db, "test_country_create")
 
 	store, err := NewStore(NewStoreOptions{
 		DB:                 db,
 		CountryTableName:   "test_country_create_country",
 		StateTableName:     "test_country_create_state",
 		TimezoneTableName:  "test_country_create_timezone",
-		AutomigrateEnabled: false, // We're handling table creation manually
+		AutomigrateEnabled: true,
 	})
 
 	if err != nil {
@@ -107,6 +57,8 @@ func TestStoreCountryCreate(t *testing.T) {
 
 	// enable SQL debug logging for this test to help diagnose sqlite syntax errors
 	store.EnableDebug(true)
+
+	setupTestDB(t, store)
 
 	ctx := context.Background()
 
@@ -123,7 +75,6 @@ func TestStoreCountryCreate(t *testing.T) {
 
 func TestStoreCountryFindByID(t *testing.T) {
 	db := initDB()
-	setupTestDB(t, db, "test_country_find_by_id")
 
 	store, err := NewStore(NewStoreOptions{
 		DB:                 db,
@@ -140,6 +91,8 @@ func TestStoreCountryFindByID(t *testing.T) {
 	if store == nil {
 		t.Fatal("unexpected nil store")
 	}
+
+	setupTestDB(t, store)
 
 	ctx := context.Background()
 
@@ -188,7 +141,6 @@ func TestStoreCountryFindByID(t *testing.T) {
 
 func TestStoreCountrySoftDelete(t *testing.T) {
 	db := initDB()
-	setupTestDB(t, db, "test_country_soft_delete")
 
 	store, err := NewStore(NewStoreOptions{
 		DB:                 db,
@@ -205,6 +157,8 @@ func TestStoreCountrySoftDelete(t *testing.T) {
 	if store == nil {
 		t.Fatal("unexpected nil store")
 	}
+
+	setupTestDB(t, store)
 
 	ctx := context.Background()
 
@@ -262,7 +216,6 @@ func TestStoreCountrySoftDelete(t *testing.T) {
 
 func TestStoreStateAutomigrate(t *testing.T) {
 	db := initDB()
-	setupTestDB(t, db, "test_state_create")
 
 	store, err := NewStore(NewStoreOptions{
 		DB:                 db,
@@ -279,6 +232,8 @@ func TestStoreStateAutomigrate(t *testing.T) {
 	if store == nil {
 		t.Fatal("unexpected nil store")
 	}
+
+	setupTestDB(t, store)
 
 	ctx := context.Background()
 
@@ -295,7 +250,6 @@ func TestStoreStateAutomigrate(t *testing.T) {
 
 func TestStoreStateCreate(t *testing.T) {
 	db := initDB()
-	setupTestDB(t, db, "test_state_create2")
 
 	store, err := NewStore(NewStoreOptions{
 		DB:                 db,
@@ -312,6 +266,8 @@ func TestStoreStateCreate(t *testing.T) {
 	if store == nil {
 		t.Fatal("unexpected nil store")
 	}
+
+	setupTestDB(t, store)
 
 	state := NewState().
 		SetStatus(COUNTRY_STATUS_ACTIVE).

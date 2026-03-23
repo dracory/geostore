@@ -411,35 +411,45 @@ func (store *storeImplementation) StatesCreate(states []*State) error {
 		states[index] = state
 	}
 
-	rows := []map[string]string{}
+	const batchSize = 50
 
-	for _, state := range states {
-		data := state.Data()
-		rows = append(rows, data)
-	}
+	for i := 0; i < len(states); i += batchSize {
+		end := i + batchSize
+		if end > len(states) {
+			end = len(states)
+		}
 
-	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-		Insert(store.stateTableName).
-		Prepared(true).
-		Rows(rows).
-		ToSQL()
+		batch := states[i:end]
+		rows := []map[string]string{}
 
-	if errSql != nil {
-		return errSql
-	}
+		for _, state := range batch {
+			data := state.Data()
+			rows = append(rows, data)
+		}
 
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
+		sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
+			Insert(store.stateTableName).
+			Prepared(true).
+			Rows(rows).
+			ToSQL()
 
-	_, err := store.db.Exec(sqlStr, params...)
+		if errSql != nil {
+			return errSql
+		}
 
-	if err != nil {
-		return err
-	}
+		if store.debugEnabled {
+			log.Println(sqlStr)
+		}
 
-	for _, state := range states {
-		state.MarkAsNotDirty()
+		_, err := store.db.Exec(sqlStr, params...)
+
+		if err != nil {
+			return err
+		}
+
+		for _, state := range batch {
+			state.MarkAsNotDirty()
+		}
 	}
 
 	return nil

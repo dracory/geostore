@@ -1707,7 +1707,7 @@ var countries = []map[string]string{
 	},
 }
 
-func (store *Store) seedCountriesIfTableIsEmpty() error {
+func (store *storeImplementation) seedCountriesIfTableIsEmpty() error {
 	ctx := context.Background()
 	list, err := store.CountryList(ctx, CountryQueryOptions{
 		Limit: 1,

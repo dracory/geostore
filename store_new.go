@@ -16,7 +16,7 @@ type NewStoreOptions struct {
 	AutomigrateEnabled bool
 }
 
-func NewStore(options NewStoreOptions) (*Store, error) {
+func NewStore(options NewStoreOptions) (StoreInterface, error) {
 	if options.CountryTableName == "" {
 		return nil, errors.New("geo store: CountryTableName is required")
 	}
@@ -37,7 +37,7 @@ func NewStore(options NewStoreOptions) (*Store, error) {
 		options.DbDriverName = sb.DatabaseDriverName(options.DB)
 	}
 
-	store := &Store{
+	store := &storeImplementation{
 		db:                 options.DB,
 		dbDriverName:       options.DbDriverName,
 		countryTableName:   options.CountryTableName,

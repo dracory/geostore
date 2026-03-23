@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"log"
-	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/dracory/database"
@@ -16,9 +15,9 @@ import (
 
 // const DISCOUNT_TABLE_NAME = "shop_country"
 
-var _ StoreInterface = (*Store)(nil) // verify it extends the interface
+var _ StoreInterface = (*storeImplementation)(nil) // verify it extends the interface
 
-type Store struct {
+type storeImplementation struct {
 	countryTableName   string
 	stateTableName     string
 	timezoneTableName  string
@@ -29,7 +28,7 @@ type Store struct {
 }
 
 // AutoMigrate auto migrate
-func (store *Store) AutoMigrate() error {
+func (store *storeImplementation) AutoMigrate() error {
 	// create country table
 	sql, err := store.sqlCountryTableCreate()
 	if err != nil {
@@ -109,11 +108,11 @@ func (store *Store) AutoMigrate() error {
 }
 
 // EnableDebug - enables the debug option
-func (st *Store) EnableDebug(debug bool) {
-	st.debugEnabled = debug
+func (store *storeImplementation) EnableDebug(debug bool) {
+	store.debugEnabled = debug
 }
 
-func (store *Store) CountryCreate(ctx context.Context, country *Country) error {
+func (store *storeImplementation) CountryCreate(ctx context.Context, country *Country) error {
 	country.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 	country.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
@@ -144,7 +143,7 @@ func (store *Store) CountryCreate(ctx context.Context, country *Country) error {
 	return nil
 }
 
-func (store *Store) CountryDelete(ctx context.Context, country *Country) error {
+func (store *storeImplementation) CountryDelete(ctx context.Context, country *Country) error {
 	if country == nil {
 		return errors.New("country is nil")
 	}
@@ -152,7 +151,7 @@ func (store *Store) CountryDelete(ctx context.Context, country *Country) error {
 	return store.CountryDeleteByID(ctx, country.ID())
 }
 
-func (store *Store) CountryDeleteByID(ctx context.Context, id string) error {
+func (store *storeImplementation) CountryDeleteByID(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("country id is empty")
 	}
@@ -176,7 +175,7 @@ func (store *Store) CountryDeleteByID(ctx context.Context, id string) error {
 	return err
 }
 
-func (store *Store) CountryFindByID(ctx context.Context, id string) (*Country, error) {
+func (store *storeImplementation) CountryFindByID(ctx context.Context, id string) (*Country, error) {
 	if id == "" {
 		return nil, errors.New("country id is empty")
 	}
@@ -197,7 +196,7 @@ func (store *Store) CountryFindByID(ctx context.Context, id string) (*Country, e
 	return nil, nil
 }
 
-func (store *Store) CountryFindByIso2(ctx context.Context, iso2Code string) (*Country, error) {
+func (store *storeImplementation) CountryFindByIso2(ctx context.Context, iso2Code string) (*Country, error) {
 	if iso2Code == "" {
 		return nil, errors.New("country iso2 code is empty")
 	}
@@ -219,7 +218,7 @@ func (store *Store) CountryFindByIso2(ctx context.Context, iso2Code string) (*Co
 	return nil, nil
 }
 
-func (store *Store) CountryNameFindByIso2(ctx context.Context, iso2Code string) (string, error) {
+func (store *storeImplementation) CountryNameFindByIso2(ctx context.Context, iso2Code string) (string, error) {
 	country, err := store.CountryFindByIso2(ctx, iso2Code)
 
 	if err != nil {
@@ -233,7 +232,7 @@ func (store *Store) CountryNameFindByIso2(ctx context.Context, iso2Code string) 
 	return country.Name(), nil
 }
 
-func (store *Store) CountryList(ctx context.Context, options CountryQueryOptions) ([]Country, error) {
+func (store *storeImplementation) CountryList(ctx context.Context, options CountryQueryOptions) ([]Country, error) {
 	q := store.countryQuery(options)
 
 	sqlStr, params, errSql := q.Select().ToSQL()
@@ -261,7 +260,7 @@ func (store *Store) CountryList(ctx context.Context, options CountryQueryOptions
 	return list, nil
 }
 
-func (store *Store) CountrySoftDelete(ctx context.Context, country *Country) error {
+func (store *storeImplementation) CountrySoftDelete(ctx context.Context, country *Country) error {
 	if country == nil {
 		return errors.New("country is nil")
 	}
@@ -271,7 +270,7 @@ func (store *Store) CountrySoftDelete(ctx context.Context, country *Country) err
 	return store.CountryUpdate(ctx, country)
 }
 
-func (store *Store) CountrySoftDeleteByID(ctx context.Context, id string) error {
+func (store *storeImplementation) CountrySoftDeleteByID(ctx context.Context, id string) error {
 	country, err := store.CountryFindByID(ctx, id)
 
 	if err != nil {
@@ -281,7 +280,7 @@ func (store *Store) CountrySoftDeleteByID(ctx context.Context, id string) error 
 	return store.CountrySoftDelete(ctx, country)
 }
 
-func (store *Store) CountryUpdate(ctx context.Context, country *Country) error {
+func (store *storeImplementation) CountryUpdate(ctx context.Context, country *Country) error {
 	if country == nil {
 		return errors.New("country is nil")
 	}
@@ -320,7 +319,7 @@ func (store *Store) CountryUpdate(ctx context.Context, country *Country) error {
 	return err
 }
 
-func (store *Store) countryQuery(options CountryQueryOptions) *goqu.SelectDataset {
+func (store *storeImplementation) countryQuery(options CountryQueryOptions) *goqu.SelectDataset {
 	q := goqu.Dialect(store.dbDriverName).From(store.countryTableName)
 
 	if options.ID != "" {
@@ -331,10 +330,6 @@ func (store *Store) countryQuery(options CountryQueryOptions) *goqu.SelectDatase
 		q = q.Where(goqu.C(COLUMN_STATUS).Eq(options.Status))
 	}
 
-	if len(options.StatusIn) > 0 {
-		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
-	}
-
 	if options.Iso2 != "" {
 		q = q.Where(goqu.C(COLUMN_ISO2_CODE).Eq(options.Iso2))
 	}
@@ -343,26 +338,31 @@ func (store *Store) countryQuery(options CountryQueryOptions) *goqu.SelectDatase
 		q = q.Where(goqu.C(COLUMN_ISO3_CODE).Eq(options.Iso3))
 	}
 
-	if !options.CountOnly {
-		if options.Limit > 0 {
-			q = q.Limit(uint(options.Limit))
-		}
-
-		if options.Offset > 0 {
-			q = q.Offset(uint(options.Offset))
-		}
+	if len(options.IDIn) > 0 {
+		q = q.Where(goqu.C(COLUMN_ID).In(options.IDIn))
 	}
 
-	sortOrder := "desc"
-	if options.SortOrder != "" {
-		sortOrder = options.SortOrder
+	if len(options.StatusIn) > 0 {
+		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
+	}
+
+	if options.CountOnly {
+		q = q.Select(goqu.COUNT("*"))
+	}
+
+	if options.Limit > 0 {
+		q = q.Limit(uint(options.Limit))
+	}
+
+	if options.Offset > 0 {
+		q = q.Offset(uint(options.Offset))
 	}
 
 	if options.OrderBy != "" {
-		if strings.EqualFold(sortOrder, sb.ASC) {
-			q = q.Order(goqu.I(options.OrderBy).Asc())
+		if options.SortOrder == "desc" {
+			q = q.Order(goqu.C(options.OrderBy).Desc())
 		} else {
-			q = q.Order(goqu.I(options.OrderBy).Desc())
+			q = q.Order(goqu.C(options.OrderBy).Asc())
 		}
 	}
 
@@ -373,7 +373,7 @@ func (store *Store) countryQuery(options CountryQueryOptions) *goqu.SelectDatase
 	return q
 }
 
-func (store *Store) StateCreate(state *State) error {
+func (store *storeImplementation) StateCreate(state *State) error {
 	state.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 	state.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
@@ -404,7 +404,7 @@ func (store *Store) StateCreate(state *State) error {
 	return nil
 }
 
-func (store *Store) StatesCreate(states []*State) error {
+func (store *storeImplementation) StatesCreate(states []*State) error {
 	for index, state := range states {
 		state.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 		state.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
@@ -418,34 +418,24 @@ func (store *Store) StatesCreate(states []*State) error {
 		rows = append(rows, data)
 	}
 
-	limit := 500
-	batches := [][]map[string]string{}
+	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
+		Insert(store.stateTableName).
+		Prepared(true).
+		Rows(rows).
+		ToSQL()
 
-	for i := 0; i < len(rows); i += limit {
-		batch := rows[i:min(i+limit, len(rows))]
-		batches = append(batches, batch)
+	if errSql != nil {
+		return errSql
 	}
 
-	for _, batch := range batches {
-		sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-			Insert(store.stateTableName).
-			Prepared(true).
-			Rows(batch).
-			ToSQL()
+	if store.debugEnabled {
+		log.Println(sqlStr)
+	}
 
-		if errSql != nil {
-			return errSql
-		}
+	_, err := store.db.Exec(sqlStr, params...)
 
-		if store.debugEnabled {
-			log.Println(sqlStr)
-		}
-
-		_, err := store.db.Exec(sqlStr, params...)
-
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return err
 	}
 
 	for _, state := range states {
@@ -455,7 +445,7 @@ func (store *Store) StatesCreate(states []*State) error {
 	return nil
 }
 
-func (store *Store) StateList(ctx context.Context, options StateQueryOptions) ([]State, error) {
+func (store *storeImplementation) StateList(ctx context.Context, options StateQueryOptions) ([]State, error) {
 	q := store.stateQuery(options)
 
 	sqlStr, params, errSql := q.Select().ToSQL()
@@ -483,7 +473,7 @@ func (store *Store) StateList(ctx context.Context, options StateQueryOptions) ([
 	return list, nil
 }
 
-func (store *Store) stateQuery(options StateQueryOptions) *goqu.SelectDataset {
+func (store *storeImplementation) stateQuery(options StateQueryOptions) *goqu.SelectDataset {
 	q := goqu.Dialect(store.dbDriverName).From(store.stateTableName)
 
 	if options.ID != "" {
@@ -494,38 +484,31 @@ func (store *Store) stateQuery(options StateQueryOptions) *goqu.SelectDataset {
 		q = q.Where(goqu.C(COLUMN_STATUS).Eq(options.Status))
 	}
 
-	if len(options.StatusIn) > 0 {
-		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
-	}
-
 	if options.CountryCode != "" {
 		q = q.Where(goqu.C(COLUMN_COUNTRY_CODE).Eq(options.CountryCode))
 	}
 
-	if options.StateCode != "" {
-		q = q.Where(goqu.C(COLUMN_STATE_CODE).Eq(options.StateCode))
+	if len(options.StatusIn) > 0 {
+		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
 	}
 
-	if !options.CountOnly {
-		if options.Limit > 0 {
-			q = q.Limit(uint(options.Limit))
-		}
-
-		if options.Offset > 0 {
-			q = q.Offset(uint(options.Offset))
-		}
+	if options.CountOnly {
+		q = q.Select(goqu.COUNT("*"))
 	}
 
-	sortOrder := "desc"
-	if options.SortOrder != "" {
-		sortOrder = options.SortOrder
+	if options.Limit > 0 {
+		q = q.Limit(uint(options.Limit))
+	}
+
+	if options.Offset > 0 {
+		q = q.Offset(uint(options.Offset))
 	}
 
 	if options.OrderBy != "" {
-		if strings.EqualFold(sortOrder, sb.ASC) {
-			q = q.Order(goqu.I(options.OrderBy).Asc())
+		if options.SortOrder == "desc" {
+			q = q.Order(goqu.C(options.OrderBy).Desc())
 		} else {
-			q = q.Order(goqu.I(options.OrderBy).Desc())
+			q = q.Order(goqu.C(options.OrderBy).Asc())
 		}
 	}
 
@@ -536,7 +519,7 @@ func (store *Store) stateQuery(options StateQueryOptions) *goqu.SelectDataset {
 	return q
 }
 
-func (store *Store) TimezoneCreate(ctx context.Context, timezone *Timezone) error {
+func (store *storeImplementation) TimezoneCreate(ctx context.Context, timezone *Timezone) error {
 	timezone.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 	timezone.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
@@ -556,7 +539,7 @@ func (store *Store) TimezoneCreate(ctx context.Context, timezone *Timezone) erro
 		log.Println(sqlStr)
 	}
 
-	_, err := store.db.Exec(sqlStr, params...)
+	_, err := store.db.ExecContext(ctx, sqlStr, params...)
 
 	if err != nil {
 		return err
@@ -567,10 +550,10 @@ func (store *Store) TimezoneCreate(ctx context.Context, timezone *Timezone) erro
 	return nil
 }
 
-func (store *Store) TimezoneList(ctx context.Context, options TimezoneQueryOptions) ([]Timezone, error) {
+func (store *storeImplementation) TimezoneList(ctx context.Context, options TimezoneQueryOptions) ([]Timezone, error) {
 	q := store.timezoneQuery(options)
 
-	sqlStr, _, errSql := q.Select().ToSQL()
+	sqlStr, params, errSql := q.Select().ToSQL()
 
 	if errSql != nil {
 		return []Timezone{}, nil
@@ -580,7 +563,7 @@ func (store *Store) TimezoneList(ctx context.Context, options TimezoneQueryOptio
 		log.Println(sqlStr)
 	}
 
-	modelMaps, err := database.SelectToMapString(database.NewQueryableContext(ctx, store.db), sqlStr)
+	modelMaps, err := database.SelectToMapString(database.NewQueryableContext(ctx, store.db), sqlStr, params...)
 	if err != nil {
 		return []Timezone{}, err
 	}
@@ -595,7 +578,7 @@ func (store *Store) TimezoneList(ctx context.Context, options TimezoneQueryOptio
 	return list, nil
 }
 
-func (store *Store) timezoneQuery(options TimezoneQueryOptions) *goqu.SelectDataset {
+func (store *storeImplementation) timezoneQuery(options TimezoneQueryOptions) *goqu.SelectDataset {
 	q := goqu.Dialect(store.dbDriverName).From(store.timezoneTableName)
 
 	if options.ID != "" {
@@ -606,10 +589,6 @@ func (store *Store) timezoneQuery(options TimezoneQueryOptions) *goqu.SelectData
 		q = q.Where(goqu.C(COLUMN_STATUS).Eq(options.Status))
 	}
 
-	if len(options.StatusIn) > 0 {
-		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
-	}
-
 	if options.CountryCode != "" {
 		q = q.Where(goqu.C(COLUMN_COUNTRY_CODE).Eq(options.CountryCode))
 	}
@@ -618,26 +597,27 @@ func (store *Store) timezoneQuery(options TimezoneQueryOptions) *goqu.SelectData
 		q = q.Where(goqu.C(COLUMN_TIMEZONE).Eq(options.Timezone))
 	}
 
-	if !options.CountOnly {
-		if options.Limit > 0 {
-			q = q.Limit(uint(options.Limit))
-		}
-
-		if options.Offset > 0 {
-			q = q.Offset(uint(options.Offset))
-		}
+	if len(options.StatusIn) > 0 {
+		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
 	}
 
-	sortOrder := "desc"
-	if options.SortOrder != "" {
-		sortOrder = options.SortOrder
+	if options.CountOnly {
+		q = q.Select(goqu.COUNT("*"))
+	}
+
+	if options.Limit > 0 {
+		q = q.Limit(uint(options.Limit))
+	}
+
+	if options.Offset > 0 {
+		q = q.Offset(uint(options.Offset))
 	}
 
 	if options.OrderBy != "" {
-		if strings.EqualFold(sortOrder, sb.ASC) {
-			q = q.Order(goqu.I(options.OrderBy).Asc())
+		if options.SortOrder == "desc" {
+			q = q.Order(goqu.C(options.OrderBy).Desc())
 		} else {
-			q = q.Order(goqu.I(options.OrderBy).Desc())
+			q = q.Order(goqu.C(options.OrderBy).Asc())
 		}
 	}
 

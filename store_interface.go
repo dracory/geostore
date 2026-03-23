@@ -15,6 +15,11 @@ type StoreInterface interface {
 	CountrySoftDelete(ctx context.Context, discount *Country) error
 	CountrySoftDeleteByID(ctx context.Context, discountID string) error
 	CountryUpdate(ctx context.Context, country *Country) error
+
+	StateCreate(state *State) error
+	StatesCreate(states []*State) error
+	StateList(ctx context.Context, options StateQueryOptions) ([]State, error)
+
 	TimezoneCreate(ctx context.Context, timezone *Timezone) error
 	TimezoneList(ctx context.Context, options TimezoneQueryOptions) ([]Timezone, error)
 }

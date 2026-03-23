@@ -2980,7 +2980,7 @@ var timezones = []map[string]string{
 	},
 }
 
-func (store *Store) seedTimezonesIfTableEmpty() error {
+func (store *storeImplementation) seedTimezonesIfTableEmpty() error {
 	ctx := context.Background()
 	list, err := store.TimezoneList(ctx, TimezoneQueryOptions{
 		Limit: 1,

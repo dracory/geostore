@@ -3,7 +3,7 @@ package geostore
 import "github.com/dracory/sb"
 
 // SQLCreateTable returns a SQL string for creating the country table
-func (st *Store) sqlCountryTableCreate() (string, error) {
+func (st *storeImplementation) sqlCountryTableCreate() (string, error) {
 	sql, err := sb.NewBuilder(st.dbDriverName).
 		Table(st.countryTableName).
 		Column(sb.Column{
@@ -59,7 +59,7 @@ func (st *Store) sqlCountryTableCreate() (string, error) {
 	return sql, err
 }
 
-func (st *Store) sqlStateTableCreate() (string, error) {
+func (st *storeImplementation) sqlStateTableCreate() (string, error) {
 	sql, err := sb.NewBuilder(st.dbDriverName).
 		Table(st.stateTableName).
 		Column(sb.Column{
@@ -105,7 +105,7 @@ func (st *Store) sqlStateTableCreate() (string, error) {
 	return sql, err
 }
 
-func (st *Store) sqlTimezoneTableCreate() (string, error) {
+func (st *storeImplementation) sqlTimezoneTableCreate() (string, error) {
 	sql, err := sb.NewBuilder(st.dbDriverName).
 		Table(st.timezoneTableName).
 		Column(sb.Column{

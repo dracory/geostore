@@ -3,7 +3,16 @@ package geostore
 import "context"
 
 type StoreInterface interface {
+	// Migration methods
+	MigrateUp() error
+	MigrateDown() error
+	Seed() error
+
+	// Convenience methods
 	AutoMigrate() error
+	Automigrate() error
+	Autoseed() error
+
 	EnableDebug(debug bool)
 
 	CountryCreate(ctx context.Context, country *Country) error

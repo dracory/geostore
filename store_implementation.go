@@ -24,11 +24,12 @@ type storeImplementation struct {
 	db                 *sql.DB
 	dbDriverName       string
 	automigrateEnabled bool
+	autoseedEnabled    bool
 	debugEnabled       bool
 }
 
-// AutoMigrate auto migrate
-func (store *storeImplementation) AutoMigrate() error {
+// MigrateUp creates all database tables
+func (store *storeImplementation) MigrateUp() error {
 	// create country table
 	sql, err := store.sqlCountryTableCreate()
 	if err != nil {
@@ -80,9 +81,29 @@ func (store *storeImplementation) AutoMigrate() error {
 		return err
 	}
 
-	// seed country table
-	err = store.seedCountriesIfTableIsEmpty()
+	return nil
+}
 
+// MigrateDown drops all database tables
+func (store *storeImplementation) MigrateDown() error {
+	// Drop tables in reverse order to avoid foreign key constraints
+	tables := []string{store.timezoneTableName, store.stateTableName, store.countryTableName}
+
+	for _, table := range tables {
+		_, err := store.db.Exec("DROP TABLE IF EXISTS " + table)
+		if err != nil {
+			log.Printf("Error dropping table %s: %v", table, err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Seed populates all tables with initial data
+func (store *storeImplementation) Seed() error {
+	// seed country table
+	err := store.seedCountriesIfTableIsEmpty()
 	if err != nil {
 		log.Println(err)
 		return err
@@ -90,7 +111,6 @@ func (store *storeImplementation) AutoMigrate() error {
 
 	// seed state table
 	err = store.seedStatesIfTableEmpty()
-
 	if err != nil {
 		log.Println(err)
 		return err
@@ -98,13 +118,32 @@ func (store *storeImplementation) AutoMigrate() error {
 
 	// seed timezone table
 	err = store.seedTimezonesIfTableEmpty()
-
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
 	return nil
+}
+
+// Automigrate is a convenience method that calls MigrateUp
+func (store *storeImplementation) Automigrate() error {
+	return store.MigrateUp()
+}
+
+// Autoseed is a convenience method that calls Seed
+func (store *storeImplementation) Autoseed() error {
+	return store.Seed()
+}
+
+// AutoMigrate maintains backward compatibility - migrates and seeds
+func (store *storeImplementation) AutoMigrate() error {
+	err := store.MigrateUp()
+	if err != nil {
+		return err
+	}
+
+	return store.Seed()
 }
 
 // EnableDebug - enables the debug option

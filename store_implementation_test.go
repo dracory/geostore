@@ -27,12 +27,20 @@ func initDB() *sql.DB {
 }
 
 // setupTestDB initializes a test database using the sb package for table creation
-func setupTestDB(t *testing.T, store StoreInterface) {
+// seed parameter controls whether to populate tables with initial data
+func setupTestDB(t *testing.T, store StoreInterface, seed bool) {
 	t.Helper()
 
-	err := store.AutoMigrate()
+	err := store.MigrateUp()
 	if err != nil {
-		t.Fatalf("Failed to auto-migrate tables: %v", err)
+		t.Fatalf("Failed to migrate tables: %v", err)
+	}
+
+	if seed {
+		err = store.Seed()
+		if err != nil {
+			t.Fatalf("Failed to seed tables: %v", err)
+		}
 	}
 }
 
@@ -41,10 +49,11 @@ func TestStoreCountryCreate(t *testing.T) {
 
 	store, err := NewStore(NewStoreOptions{
 		DB:                 db,
-		CountryTableName:   "test_country_create_country",
-		StateTableName:     "test_country_create_state",
-		TimezoneTableName:  "test_country_create_timezone",
-		AutomigrateEnabled: true,
+		CountryTableName:   "test_country_find_by_iso2",
+		StateTableName:     "test_country_find_by_iso2_state",
+		TimezoneTableName:  "test_country_find_by_iso2_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
 	})
 
 	if err != nil {
@@ -58,7 +67,7 @@ func TestStoreCountryCreate(t *testing.T) {
 	// enable SQL debug logging for this test to help diagnose sqlite syntax errors
 	store.EnableDebug(true)
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -92,7 +101,7 @@ func TestStoreCountryFindByID(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -158,7 +167,7 @@ func TestStoreCountrySoftDelete(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -233,7 +242,7 @@ func TestStoreStateAutomigrate(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -267,7 +276,7 @@ func TestStoreStateCreate(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	state := NewState().
 		SetStatus(COUNTRY_STATUS_ACTIVE).
@@ -287,7 +296,7 @@ func TestStoreTimezoneCreate(t *testing.T) {
 	store, err := NewStore(NewStoreOptions{
 		DB:                 db,
 		CountryTableName:   "geo_country",
-		StateTableName:     "geo_state", 
+		StateTableName:     "geo_state",
 		TimezoneTableName:  "geo_timezone",
 		AutomigrateEnabled: true,
 	})
@@ -300,7 +309,7 @@ func TestStoreTimezoneCreate(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -338,7 +347,7 @@ func TestStoreTimezoneList(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -419,7 +428,7 @@ func TestStoreCountryUpdate(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -467,7 +476,8 @@ func TestStoreCountryFindByIso2(t *testing.T) {
 		CountryTableName:   "geo_country_iso2",
 		StateTableName:     "geo_state_iso2",
 		TimezoneTableName:  "geo_timezone_iso2",
-		AutomigrateEnabled: true,
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
 	})
 
 	if err != nil {
@@ -478,7 +488,7 @@ func TestStoreCountryFindByIso2(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, false)
 
 	ctx := context.Background()
 
@@ -509,7 +519,7 @@ func TestStoreCountryFindByIso2(t *testing.T) {
 	}
 
 	if foundCountry.Name() != "IsoTest" {
-		t.Fatal("name should match", foundCountry.Name())
+		t.Fatal("name should match IsoTest", foundCountry.Name())
 	}
 }
 
@@ -532,7 +542,7 @@ func TestStoreCountryDelete(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -586,7 +596,7 @@ func TestStoreCountryDeleteByID(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	ctx := context.Background()
 
@@ -629,7 +639,8 @@ func TestStoreCountryQueryOptions(t *testing.T) {
 		CountryTableName:   "geo_country_query",
 		StateTableName:     "geo_state_query",
 		TimezoneTableName:  "geo_timezone_query",
-		AutomigrateEnabled: true,
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
 	})
 
 	if err != nil {
@@ -640,7 +651,7 @@ func TestStoreCountryQueryOptions(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, false)
 
 	ctx := context.Background()
 
@@ -727,7 +738,8 @@ func TestStoreStateQueryOptions(t *testing.T) {
 		CountryTableName:   "geo_country_state_query",
 		StateTableName:     "geo_state_state_query",
 		TimezoneTableName:  "geo_timezone_state_query",
-		AutomigrateEnabled: true,
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
 	})
 
 	if err != nil {
@@ -738,7 +750,7 @@ func TestStoreStateQueryOptions(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, false)
 
 	ctx := context.Background()
 
@@ -821,7 +833,7 @@ func TestStoreStatesCreate(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	setupTestDB(t, store)
+	setupTestDB(t, store, true)
 
 	// Create multiple states
 	states := []*State{
@@ -847,5 +859,299 @@ func TestStoreStatesCreate(t *testing.T) {
 
 	if len(allStates) < 3 {
 		t.Fatal("should find at least 3 states", len(allStates))
+	}
+}
+
+func TestStoreMigrateUp(t *testing.T) {
+	db := initDB()
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		CountryTableName:   "test_migrate_up_country",
+		StateTableName:     "test_migrate_up_state",
+		TimezoneTableName:  "test_migrate_up_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
+	})
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if store == nil {
+		t.Fatal("unexpected nil store")
+	}
+
+	// Test MigrateUp creates tables
+	err = store.MigrateUp()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Verify tables exist by checking we can query them
+	ctx := context.Background()
+
+	// Check country table exists
+	countries, err := store.CountryList(ctx, CountryQueryOptions{Limit: 1})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if countries == nil {
+		t.Fatal("countries should not be nil")
+	}
+
+	// Check state table exists
+	states, err := store.StateList(ctx, StateQueryOptions{Limit: 1})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if states == nil {
+		t.Fatal("states should not be nil")
+	}
+
+	// Check timezone table exists
+	timezones, err := store.TimezoneList(ctx, TimezoneQueryOptions{Limit: 1})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if timezones == nil {
+		t.Fatal("timezones should not be nil")
+	}
+}
+
+func TestStoreMigrateDown(t *testing.T) {
+	db := initDB()
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		CountryTableName:   "test_migrate_down_country",
+		StateTableName:     "test_migrate_down_state",
+		TimezoneTableName:  "test_migrate_down_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
+	})
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if store == nil {
+		t.Fatal("unexpected nil store")
+	}
+
+	// First migrate up to create tables
+	err = store.MigrateUp()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Verify tables exist
+	ctx := context.Background()
+	_, err = store.CountryList(ctx, CountryQueryOptions{Limit: 1})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Test MigrateDown drops tables
+	err = store.MigrateDown()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Verify tables are gone - should get errors when querying
+	_, err = store.CountryList(ctx, CountryQueryOptions{Limit: 1})
+	if err == nil {
+		t.Fatal("expected error when querying dropped table")
+	}
+}
+
+func TestStoreSeed(t *testing.T) {
+	db := initDB()
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		CountryTableName:   "test_seed_country",
+		StateTableName:     "test_seed_state",
+		TimezoneTableName:  "test_seed_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
+	})
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if store == nil {
+		t.Fatal("unexpected nil store")
+	}
+
+	// First migrate up to create tables
+	err = store.MigrateUp()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Test Seed populates data
+	err = store.Seed()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Verify seeded data exists
+	ctx := context.Background()
+
+	// Check countries are seeded
+	countries, err := store.CountryList(ctx, CountryQueryOptions{})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if len(countries) == 0 {
+		t.Fatal("countries should be seeded")
+	}
+
+	// Check states are seeded
+	states, err := store.StateList(ctx, StateQueryOptions{})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if len(states) == 0 {
+		t.Fatal("states should be seeded")
+	}
+
+	// Check timezones are seeded
+	timezones, err := store.TimezoneList(ctx, TimezoneQueryOptions{})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if len(timezones) == 0 {
+		t.Fatal("timezones should be seeded")
+	}
+}
+
+func TestStoreAutomigrate(t *testing.T) {
+	db := initDB()
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		CountryTableName:   "test_automigrate_country",
+		StateTableName:     "test_automigrate_state",
+		TimezoneTableName:  "test_automigrate_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
+	})
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if store == nil {
+		t.Fatal("unexpected nil store")
+	}
+
+	// Test Automigrate only migrates (doesn't seed)
+	err = store.Automigrate()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Verify tables exist but are empty
+	ctx := context.Background()
+
+	countries, err := store.CountryList(ctx, CountryQueryOptions{})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if len(countries) != 0 {
+		t.Fatal("countries should be empty after Automigrate only", len(countries))
+	}
+}
+
+func TestStoreAutoseed(t *testing.T) {
+	db := initDB()
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		CountryTableName:   "test_autoseed_country",
+		StateTableName:     "test_autoseed_state",
+		TimezoneTableName:  "test_autoseed_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
+	})
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if store == nil {
+		t.Fatal("unexpected nil store")
+	}
+
+	// First migrate up to create tables
+	err = store.MigrateUp()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Test Autoseed only seeds (doesn't migrate)
+	err = store.Autoseed()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Verify data is seeded
+	ctx := context.Background()
+
+	countries, err := store.CountryList(ctx, CountryQueryOptions{})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if len(countries) == 0 {
+		t.Fatal("countries should be seeded after Autoseed")
+	}
+}
+
+func TestStoreAutoMigrateBackwardCompatibility(t *testing.T) {
+	db := initDB()
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		CountryTableName:   "test_auto_migrate_compat_country",
+		StateTableName:     "test_auto_migrate_compat_state",
+		TimezoneTableName:  "test_auto_migrate_compat_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
+	})
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if store == nil {
+		t.Fatal("unexpected nil store")
+	}
+
+	// Test AutoMigrate maintains backward compatibility (migrates + seeds)
+	err = store.AutoMigrate()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// Verify both tables exist and data is seeded
+	ctx := context.Background()
+
+	countries, err := store.CountryList(ctx, CountryQueryOptions{})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if len(countries) == 0 {
+		t.Fatal("countries should be seeded after AutoMigrate")
+	}
+
+	states, err := store.StateList(ctx, StateQueryOptions{})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if len(states) == 0 {
+		t.Fatal("states should be seeded after AutoMigrate")
 	}
 }

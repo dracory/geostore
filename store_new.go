@@ -14,6 +14,7 @@ type NewStoreOptions struct {
 	StateTableName     string
 	TimezoneTableName  string
 	AutomigrateEnabled bool
+	AutoseedEnabled    bool
 }
 
 func NewStore(options NewStoreOptions) (StoreInterface, error) {
@@ -44,6 +45,7 @@ func NewStore(options NewStoreOptions) (StoreInterface, error) {
 		stateTableName:     options.StateTableName,
 		timezoneTableName:  options.TimezoneTableName,
 		automigrateEnabled: options.AutomigrateEnabled,
+		autoseedEnabled:    options.AutoseedEnabled,
 	}
 
 	if store.automigrateEnabled {

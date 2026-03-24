@@ -49,9 +49,9 @@ func TestStoreCountryCreate(t *testing.T) {
 
 	store, err := NewStore(NewStoreOptions{
 		DB:                 db,
-		CountryTableName:   "test_country_find_by_iso2",
-		StateTableName:     "test_country_find_by_iso2_state",
-		TimezoneTableName:  "test_country_find_by_iso2_timezone",
+		CountryTableName:   "test_country_create",
+		StateTableName:     "test_country_create_state",
+		TimezoneTableName:  "test_country_create_timezone",
 		AutomigrateEnabled: false,
 		AutoseedEnabled:    false,
 	})
@@ -63,9 +63,6 @@ func TestStoreCountryCreate(t *testing.T) {
 	if store == nil {
 		t.Fatal("unexpected nil store")
 	}
-
-	// enable SQL debug logging for this test to help diagnose sqlite syntax errors
-	store.EnableDebug(true)
 
 	setupTestDB(t, store, true)
 

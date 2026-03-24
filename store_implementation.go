@@ -453,10 +453,7 @@ func (store *storeImplementation) StatesCreate(states []*State) error {
 	const batchSize = 50
 
 	for i := 0; i < len(states); i += batchSize {
-		end := i + batchSize
-		if end > len(states) {
-			end = len(states)
-		}
+		end := min(i+batchSize, len(states))
 
 		batch := states[i:end]
 		rows := []map[string]string{}

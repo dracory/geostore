@@ -29,7 +29,7 @@ type storeImplementation struct {
 }
 
 // MigrateUp creates all database tables
-func (store *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
+func (store *storeImplementation) MigrateUp(ctx context.Context, tx ...*sql.Tx) error {
 	var txToUse *sql.Tx
 	if len(tx) > 0 {
 		txToUse = tx[0]
@@ -48,9 +48,9 @@ func (store *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
 
 	var errExec error
 	if txToUse != nil {
-		_, errExec = txToUse.Exec(sql)
+		_, errExec = txToUse.ExecContext(ctx, sql)
 	} else {
-		_, errExec = store.db.Exec(sql)
+		_, errExec = store.db.ExecContext(ctx, sql)
 	}
 
 	if errExec != nil {
@@ -70,9 +70,9 @@ func (store *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
 	}
 
 	if txToUse != nil {
-		_, errExec = txToUse.Exec(sql)
+		_, errExec = txToUse.ExecContext(ctx, sql)
 	} else {
-		_, errExec = store.db.Exec(sql)
+		_, errExec = store.db.ExecContext(ctx, sql)
 	}
 
 	if errExec != nil {
@@ -92,9 +92,9 @@ func (store *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
 	}
 
 	if txToUse != nil {
-		_, errExec = txToUse.Exec(sql)
+		_, errExec = txToUse.ExecContext(ctx, sql)
 	} else {
-		_, errExec = store.db.Exec(sql)
+		_, errExec = store.db.ExecContext(ctx, sql)
 	}
 
 	if errExec != nil {
@@ -106,7 +106,7 @@ func (store *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
 }
 
 // MigrateDown drops all database tables
-func (store *storeImplementation) MigrateDown(tx ...*sql.Tx) error {
+func (store *storeImplementation) MigrateDown(ctx context.Context, tx ...*sql.Tx) error {
 	var txToUse *sql.Tx
 	if len(tx) > 0 {
 		txToUse = tx[0]
@@ -131,9 +131,9 @@ func (store *storeImplementation) MigrateDown(tx ...*sql.Tx) error {
 
 		var errExec error
 		if txToUse != nil {
-			_, errExec = txToUse.Exec(sql)
+			_, errExec = txToUse.ExecContext(ctx, sql)
 		} else {
-			_, errExec = store.db.Exec(sql)
+			_, errExec = store.db.ExecContext(ctx, sql)
 		}
 
 		if errExec != nil {
@@ -146,7 +146,7 @@ func (store *storeImplementation) MigrateDown(tx ...*sql.Tx) error {
 }
 
 // Seed populates all tables with initial data
-func (store *storeImplementation) Seed(tx ...*sql.Tx) error {
+func (store *storeImplementation) Seed(ctx context.Context, tx ...*sql.Tx) error {
 	// seed country table
 	err := store.seedCountriesIfTableIsEmpty()
 	if err != nil {

@@ -22,13 +22,13 @@ type StoreInterface interface {
 	SetTimezoneTableName(timezoneTableName string)
 
 	// MigrateUp creates all database tables
-	MigrateDown(tx ...*sql.Tx) error
+	MigrateDown(ctx context.Context, tx ...*sql.Tx) error
 
 	// MigrateDown drops all database tables
-	MigrateUp(tx ...*sql.Tx) error
+	MigrateUp(ctx context.Context, tx ...*sql.Tx) error
 
 	// Seed populates all tables with initial data
-	Seed(tx ...*sql.Tx) error
+	Seed(ctx context.Context, tx ...*sql.Tx) error
 
 	EnableDebug(debug bool)
 

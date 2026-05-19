@@ -31,13 +31,14 @@ func initDB() *sql.DB {
 func setupTestDB(t *testing.T, store StoreInterface, seed bool) {
 	t.Helper()
 
-	err := store.MigrateUp()
+	err := store.MigrateUp(context.Background())
+
 	if err != nil {
-		t.Fatalf("Failed to migrate tables: %v", err)
+		t.Fatal("MigrateUp failed: " + err.Error())
 	}
 
 	if seed {
-		err = store.Seed()
+		err = store.Seed(context.Background())
 		if err != nil {
 			t.Fatalf("Failed to seed tables: %v", err)
 		}
@@ -880,7 +881,7 @@ func TestStoreMigrateUp(t *testing.T) {
 	}
 
 	// Test MigrateUp creates tables
-	err = store.MigrateUp()
+	err = store.MigrateUp(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -937,7 +938,7 @@ func TestStoreMigrateDown(t *testing.T) {
 	}
 
 	// First migrate up to create tables
-	err = store.MigrateUp()
+	err = store.MigrateUp(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -950,7 +951,7 @@ func TestStoreMigrateDown(t *testing.T) {
 	}
 
 	// Test MigrateDown drops tables
-	err = store.MigrateDown()
+	err = store.MigrateDown(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -983,13 +984,13 @@ func TestStoreSeed(t *testing.T) {
 	}
 
 	// First migrate up to create tables
-	err = store.MigrateUp()
+	err = store.MigrateUp(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
 	// Test Seed populates data
-	err = store.Seed()
+	err = store.Seed(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -1046,7 +1047,7 @@ func TestStoreAutomigrate(t *testing.T) {
 	}
 
 	// Test MigrateUp only migrates (doesn't seed)
-	err = store.MigrateUp()
+	err = store.MigrateUp(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -1084,13 +1085,13 @@ func TestStoreAutoseed(t *testing.T) {
 	}
 
 	// First migrate up to create tables
-	err = store.MigrateUp()
+	err = store.MigrateUp(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
 	// Test Seed only seeds (doesn't migrate)
-	err = store.Seed()
+	err = store.Seed(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -1128,12 +1129,12 @@ func TestStoreAutoMigrateBackwardCompatibility(t *testing.T) {
 	}
 
 	// Test MigrateUp + Seed maintains backward compatibility (migrates + seeds)
-	err = store.MigrateUp()
+	err = store.MigrateUp(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
-	err = store.Seed()
+	err = store.Seed(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}

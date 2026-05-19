@@ -1,6 +1,7 @@
 package geostore
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 
@@ -49,7 +50,7 @@ func NewStore(options NewStoreOptions) (StoreInterface, error) {
 	}
 
 	if store.automigrateEnabled {
-		err := store.MigrateUp()
+		err := store.MigrateUp(context.Background())
 
 		if err != nil {
 			return nil, err
@@ -57,7 +58,7 @@ func NewStore(options NewStoreOptions) (StoreInterface, error) {
 	}
 
 	if store.autoseedEnabled {
-		err := store.Seed()
+		err := store.Seed(context.Background())
 
 		if err != nil {
 			return nil, err

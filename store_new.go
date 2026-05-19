@@ -49,7 +49,15 @@ func NewStore(options NewStoreOptions) (StoreInterface, error) {
 	}
 
 	if store.automigrateEnabled {
-		err := store.AutoMigrate()
+		err := store.MigrateUp()
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if store.autoseedEnabled {
+		err := store.Seed()
 
 		if err != nil {
 			return nil, err

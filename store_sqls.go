@@ -153,10 +153,35 @@ func (st *storeImplementation) sqlTimezoneTableCreate() (string, error) {
 			Type: sb.COLUMN_TYPE_DATETIME,
 		}).
 		Column(sb.Column{
-			Name: COLUMN_DELETED_AT,
-			Type: sb.COLUMN_TYPE_DATETIME,
+			Name:     COLUMN_DELETED_AT,
+			Type:     sb.COLUMN_TYPE_DATETIME,
+			Nullable: true,
 		}).
 		CreateIfNotExists()
 
+	return sql, err
+}
+
+// sqlCountryTableDrop returns a SQL string for dropping the country table
+func (st *storeImplementation) sqlCountryTableDrop() (string, error) {
+	sql, err := sb.NewBuilder(st.dbDriverName).
+		Table(st.countryTableName).
+		Drop()
+	return sql, err
+}
+
+// sqlStateTableDrop returns a SQL string for dropping the state table
+func (st *storeImplementation) sqlStateTableDrop() (string, error) {
+	sql, err := sb.NewBuilder(st.dbDriverName).
+		Table(st.stateTableName).
+		Drop()
+	return sql, err
+}
+
+// sqlTimezoneTableDrop returns a SQL string for dropping the timezone table
+func (st *storeImplementation) sqlTimezoneTableDrop() (string, error) {
+	sql, err := sb.NewBuilder(st.dbDriverName).
+		Table(st.timezoneTableName).
+		Drop()
 	return sql, err
 }

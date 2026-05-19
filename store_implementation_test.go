@@ -1045,8 +1045,8 @@ func TestStoreAutomigrate(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	// Test Automigrate only migrates (doesn't seed)
-	err = store.Automigrate()
+	// Test MigrateUp only migrates (doesn't seed)
+	err = store.MigrateUp()
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -1089,8 +1089,8 @@ func TestStoreAutoseed(t *testing.T) {
 		t.Fatal("unexpected error:", err)
 	}
 
-	// Test Autoseed only seeds (doesn't migrate)
-	err = store.Autoseed()
+	// Test Seed only seeds (doesn't migrate)
+	err = store.Seed()
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -1127,8 +1127,13 @@ func TestStoreAutoMigrateBackwardCompatibility(t *testing.T) {
 		t.Fatal("unexpected nil store")
 	}
 
-	// Test AutoMigrate maintains backward compatibility (migrates + seeds)
-	err = store.AutoMigrate()
+	// Test MigrateUp + Seed maintains backward compatibility (migrates + seeds)
+	err = store.MigrateUp()
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	err = store.Seed()
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}

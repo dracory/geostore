@@ -29,7 +29,12 @@ type storeImplementation struct {
 }
 
 // MigrateUp creates all database tables
-func (store *storeImplementation) MigrateUp() error {
+func (store *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
+	var txToUse *sql.Tx
+	if len(tx) > 0 {
+		txToUse = tx[0]
+	}
+
 	// create country table
 	sql, err := store.sqlCountryTableCreate()
 	if err != nil {
@@ -41,10 +46,16 @@ func (store *storeImplementation) MigrateUp() error {
 		return errors.New("country table create sql is empty")
 	}
 
-	_, err = store.db.Exec(sql)
-	if err != nil {
-		log.Println(err)
-		return err
+	var errExec error
+	if txToUse != nil {
+		_, errExec = txToUse.Exec(sql)
+	} else {
+		_, errExec = store.db.Exec(sql)
+	}
+
+	if errExec != nil {
+		log.Println(errExec)
+		return errExec
 	}
 
 	// create state table
@@ -58,10 +69,15 @@ func (store *storeImplementation) MigrateUp() error {
 		return errors.New("state table create sql is empty")
 	}
 
-	_, err = store.db.Exec(sql)
-	if err != nil {
-		log.Println(err)
-		return err
+	if txToUse != nil {
+		_, errExec = txToUse.Exec(sql)
+	} else {
+		_, errExec = store.db.Exec(sql)
+	}
+
+	if errExec != nil {
+		log.Println(errExec)
+		return errExec
 	}
 
 	// create timezone table
@@ -75,25 +91,54 @@ func (store *storeImplementation) MigrateUp() error {
 		return errors.New("timezone table create sql is empty")
 	}
 
-	_, err = store.db.Exec(sql)
-	if err != nil {
-		log.Println(err)
-		return err
+	if txToUse != nil {
+		_, errExec = txToUse.Exec(sql)
+	} else {
+		_, errExec = store.db.Exec(sql)
+	}
+
+	if errExec != nil {
+		log.Println(errExec)
+		return errExec
 	}
 
 	return nil
 }
 
 // MigrateDown drops all database tables
-func (store *storeImplementation) MigrateDown() error {
+func (store *storeImplementation) MigrateDown(tx ...*sql.Tx) error {
+	var txToUse *sql.Tx
+	if len(tx) > 0 {
+		txToUse = tx[0]
+	}
+
 	// Drop tables in reverse order to avoid foreign key constraints
-	tables := []string{store.timezoneTableName, store.stateTableName, store.countryTableName}
+	tables := []struct {
+		name string
+		drop func() (string, error)
+	}{
+		{store.timezoneTableName, store.sqlTimezoneTableDrop},
+		{store.stateTableName, store.sqlStateTableDrop},
+		{store.countryTableName, store.sqlCountryTableDrop},
+	}
 
 	for _, table := range tables {
-		_, err := store.db.Exec("DROP TABLE IF EXISTS " + table)
+		sql, err := table.drop()
 		if err != nil {
-			log.Printf("Error dropping table %s: %v", table, err)
+			log.Printf("Error generating drop SQL for table %s: %v", table.name, err)
 			return err
+		}
+
+		var errExec error
+		if txToUse != nil {
+			_, errExec = txToUse.Exec(sql)
+		} else {
+			_, errExec = store.db.Exec(sql)
+		}
+
+		if errExec != nil {
+			log.Printf("Error dropping table %s: %v", table.name, errExec)
+			return errExec
 		}
 	}
 
@@ -101,7 +146,7 @@ func (store *storeImplementation) MigrateDown() error {
 }
 
 // Seed populates all tables with initial data
-func (store *storeImplementation) Seed() error {
+func (store *storeImplementation) Seed(tx ...*sql.Tx) error {
 	// seed country table
 	err := store.seedCountriesIfTableIsEmpty()
 	if err != nil {
@@ -126,29 +171,39 @@ func (store *storeImplementation) Seed() error {
 	return nil
 }
 
-// Automigrate is a convenience method that calls MigrateUp
-func (store *storeImplementation) Automigrate() error {
-	return store.MigrateUp()
-}
-
-// Autoseed is a convenience method that calls Seed
-func (store *storeImplementation) Autoseed() error {
-	return store.Seed()
-}
-
-// AutoMigrate maintains backward compatibility - migrates and seeds
-func (store *storeImplementation) AutoMigrate() error {
-	err := store.MigrateUp()
-	if err != nil {
-		return err
-	}
-
-	return store.Seed()
-}
-
 // EnableDebug - enables the debug option
 func (store *storeImplementation) EnableDebug(debug bool) {
 	store.debugEnabled = debug
+}
+
+// GetCountryTableName returns the country table name
+func (store *storeImplementation) GetCountryTableName() string {
+	return store.countryTableName
+}
+
+// SetCountryTableName sets the country table name
+func (store *storeImplementation) SetCountryTableName(countryTableName string) {
+	store.countryTableName = countryTableName
+}
+
+// GetStateTableName returns the state table name
+func (store *storeImplementation) GetStateTableName() string {
+	return store.stateTableName
+}
+
+// SetStateTableName sets the state table name
+func (store *storeImplementation) SetStateTableName(stateTableName string) {
+	store.stateTableName = stateTableName
+}
+
+// GetTimezoneTableName returns the timezone table name
+func (store *storeImplementation) GetTimezoneTableName() string {
+	return store.timezoneTableName
+}
+
+// SetTimezoneTableName sets the timezone table name
+func (store *storeImplementation) SetTimezoneTableName(timezoneTableName string) {
+	store.timezoneTableName = timezoneTableName
 }
 
 func (store *storeImplementation) CountryCreate(ctx context.Context, country *Country) error {

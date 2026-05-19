@@ -1,17 +1,34 @@
 package geostore
 
-import "context"
+import (
+	"context"
+	"database/sql"
+)
 
 type StoreInterface interface {
-	// Migration methods
-	MigrateUp() error
-	MigrateDown() error
-	Seed() error
+	// GetCountryTableName returns the country table name
+	GetCountryTableName() string
+	// SetCountryTableName sets the country table name
+	SetCountryTableName(countryTableName string)
 
-	// Convenience methods
-	AutoMigrate() error
-	Automigrate() error
-	Autoseed() error
+	// GetStateTableName returns the state table name
+	GetStateTableName() string
+	// SetStateTableName sets the state table name
+	SetStateTableName(stateTableName string)
+
+	// GetTimezoneTableName returns the timezone table name
+	GetTimezoneTableName() string
+	// SetTimezoneTableName sets the timezone table name
+	SetTimezoneTableName(timezoneTableName string)
+
+	// MigrateUp creates all database tables
+	MigrateDown(tx ...*sql.Tx) error
+
+	// MigrateDown drops all database tables
+	MigrateUp(tx ...*sql.Tx) error
+
+	// Seed populates all tables with initial data
+	Seed(tx ...*sql.Tx) error
 
 	EnableDebug(debug bool)
 

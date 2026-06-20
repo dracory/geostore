@@ -1707,8 +1707,7 @@ var countries = []map[string]string{
 	},
 }
 
-func (store *storeImplementation) seedCountriesIfTableIsEmpty() error {
-	ctx := context.Background()
+func (store *storeImplementation) seedCountriesIfTableIsEmpty(ctx context.Context) error {
 	list, err := store.CountryList(ctx, CountryQueryOptions{
 		Limit: 1,
 	})
@@ -1729,7 +1728,7 @@ func (store *storeImplementation) seedCountriesIfTableIsEmpty() error {
 		country.SetContinent(entry["Continent"])
 		country.SetPhonePrefix(entry["Prefix"])
 
-		err = store.CountryCreate(context.Background(), country)
+		err = store.CountryCreate(ctx, country)
 
 		if err != nil {
 			return err

@@ -5096,8 +5096,7 @@ id,name,country_id,country_code,country_name,state_code,type,latitude,longitude
 1957,"Midlands Province",247,ZW,Zimbabwe,MI,,-19.05520090,29.60354950
 `
 
-func (store *storeImplementation) seedStatesIfTableEmpty() error {
-	ctx := context.Background()
+func (store *storeImplementation) seedStatesIfTableEmpty(ctx context.Context) error {
 	list, err := store.StateList(ctx, StateQueryOptions{
 		Limit: 1,
 	})
@@ -5132,15 +5131,9 @@ func (store *storeImplementation) seedStatesIfTableEmpty() error {
 		state.SetName(name)
 
 		states = append(states, state)
-
-		// err = store.StateCreate(state)
-
-		// if err != nil {
-		// 	return err
-		// }
 	}
 
-	err = store.StatesCreate(states)
+	err = store.StatesCreate(ctx, states)
 
 	if err != nil {
 		return err

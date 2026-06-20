@@ -4,16 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
+	"fmt"
+	"log/slog"
+	"os"
+	"time"
 
-	"github.com/doug-martin/goqu/v9"
-	"github.com/dracory/database"
-	"github.com/dracory/sb"
+	"github.com/dracory/neat"
+	contractsorm "github.com/dracory/neat/contracts/database/orm"
+	contractsschema "github.com/dracory/neat/contracts/database/schema"
+	"github.com/dracory/neat/database/schema/constants"
 	"github.com/dromara/carbon/v2"
 	"github.com/samber/lo"
 )
-
-// const DISCOUNT_TABLE_NAME = "shop_country"
 
 var _ StoreInterface = (*storeImplementation)(nil) // verify it extends the interface
 
@@ -21,85 +23,74 @@ type storeImplementation struct {
 	countryTableName   string
 	stateTableName     string
 	timezoneTableName  string
-	db                 *sql.DB
-	dbDriverName       string
+	db                 *neat.Database
 	automigrateEnabled bool
 	autoseedEnabled    bool
 	debugEnabled       bool
+	logger             *slog.Logger
 }
 
 // MigrateUp creates all database tables
 func (store *storeImplementation) MigrateUp(ctx context.Context, tx ...*sql.Tx) error {
-	var txToUse *sql.Tx
-	if len(tx) > 0 {
-		txToUse = tx[0]
-	}
-
 	// create country table
-	sql, err := store.sqlCountryTableCreate()
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	if sql == "" {
-		return errors.New("country table create sql is empty")
-	}
-
-	var errExec error
-	if txToUse != nil {
-		_, errExec = txToUse.ExecContext(ctx, sql)
-	} else {
-		_, errExec = store.db.ExecContext(ctx, sql)
-	}
-
-	if errExec != nil {
-		log.Println(errExec)
-		return errExec
+	if !store.db.Schema().HasTable(store.countryTableName) {
+		err := store.db.Schema().Create(store.countryTableName, func(table contractsschema.Blueprint) {
+			table.String(COLUMN_ID, 21)
+			table.Primary(COLUMN_ID)
+			table.String(COLUMN_STATUS, 20)
+			table.String(COLUMN_ISO2_CODE, 2)
+			table.String(COLUMN_ISO3_CODE, 3)
+			table.String(COLUMN_NAME, 255)
+			table.String(COLUMN_CONTINENT, 100)
+			table.String(COLUMN_PHONE_PREFIX, 20)
+			table.DateTime(COLUMN_CREATED_AT)
+			table.DateTime(COLUMN_UPDATED_AT)
+			table.DateTime(COLUMN_SOFT_DELETED_AT).Default(constants.MaxSoftDeletedAtDefault)
+		})
+		if err != nil {
+			store.logger.Error("MigrateUp failed for country table", "error", err)
+			return err
+		}
 	}
 
 	// create state table
-	sql, err = store.sqlStateTableCreate()
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	if sql == "" {
-		return errors.New("state table create sql is empty")
-	}
-
-	if txToUse != nil {
-		_, errExec = txToUse.ExecContext(ctx, sql)
-	} else {
-		_, errExec = store.db.ExecContext(ctx, sql)
-	}
-
-	if errExec != nil {
-		log.Println(errExec)
-		return errExec
+	if !store.db.Schema().HasTable(store.stateTableName) {
+		err := store.db.Schema().Create(store.stateTableName, func(table contractsschema.Blueprint) {
+			table.String(COLUMN_ID, 21)
+			table.Primary(COLUMN_ID)
+			table.String(COLUMN_STATUS, 20)
+			table.String(COLUMN_COUNTRY_CODE, 2)
+			table.String(COLUMN_STATE_CODE, 5)
+			table.String(COLUMN_NAME, 255)
+			table.DateTime(COLUMN_CREATED_AT)
+			table.DateTime(COLUMN_UPDATED_AT)
+			table.DateTime(COLUMN_SOFT_DELETED_AT).Default(constants.MaxSoftDeletedAtDefault)
+		})
+		if err != nil {
+			store.logger.Error("MigrateUp failed for state table", "error", err)
+			return err
+		}
 	}
 
 	// create timezone table
-	sql, err = store.sqlTimezoneTableCreate()
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	if sql == "" {
-		return errors.New("timezone table create sql is empty")
-	}
-
-	if txToUse != nil {
-		_, errExec = txToUse.ExecContext(ctx, sql)
-	} else {
-		_, errExec = store.db.ExecContext(ctx, sql)
-	}
-
-	if errExec != nil {
-		log.Println(errExec)
-		return errExec
+	if !store.db.Schema().HasTable(store.timezoneTableName) {
+		err := store.db.Schema().Create(store.timezoneTableName, func(table contractsschema.Blueprint) {
+			table.String(COLUMN_ID, 21)
+			table.Primary(COLUMN_ID)
+			table.String(COLUMN_STATUS, 20)
+			table.String(COLUMN_TIMEZONE, 100)
+			table.String(COLUMN_ZONE_NAME, 100)
+			table.String(COLUMN_GLOBAL_NAME, 100)
+			table.String(COLUMN_COUNTRY_CODE, 50)
+			table.String(COLUMN_OFFSET, 50)
+			table.DateTime(COLUMN_CREATED_AT)
+			table.DateTime(COLUMN_UPDATED_AT)
+			table.DateTime(COLUMN_SOFT_DELETED_AT).Default(constants.MaxSoftDeletedAtDefault)
+		})
+		if err != nil {
+			store.logger.Error("MigrateUp failed for timezone table", "error", err)
+			return err
+		}
 	}
 
 	return nil
@@ -107,38 +98,28 @@ func (store *storeImplementation) MigrateUp(ctx context.Context, tx ...*sql.Tx) 
 
 // MigrateDown drops all database tables
 func (store *storeImplementation) MigrateDown(ctx context.Context, tx ...*sql.Tx) error {
-	var txToUse *sql.Tx
-	if len(tx) > 0 {
-		txToUse = tx[0]
-	}
-
 	// Drop tables in reverse order to avoid foreign key constraints
-	tables := []struct {
-		name string
-		drop func() (string, error)
-	}{
-		{store.timezoneTableName, store.sqlTimezoneTableDrop},
-		{store.stateTableName, store.sqlStateTableDrop},
-		{store.countryTableName, store.sqlCountryTableDrop},
-	}
-
-	for _, table := range tables {
-		sql, err := table.drop()
+	if store.db.Schema().HasTable(store.timezoneTableName) {
+		err := store.db.Schema().Drop(store.timezoneTableName)
 		if err != nil {
-			log.Printf("Error generating drop SQL for table %s: %v", table.name, err)
+			store.logger.Error("MigrateDown failed for timezone table", "error", err)
 			return err
 		}
+	}
 
-		var errExec error
-		if txToUse != nil {
-			_, errExec = txToUse.ExecContext(ctx, sql)
-		} else {
-			_, errExec = store.db.ExecContext(ctx, sql)
+	if store.db.Schema().HasTable(store.stateTableName) {
+		err := store.db.Schema().Drop(store.stateTableName)
+		if err != nil {
+			store.logger.Error("MigrateDown failed for state table", "error", err)
+			return err
 		}
+	}
 
-		if errExec != nil {
-			log.Printf("Error dropping table %s: %v", table.name, errExec)
-			return errExec
+	if store.db.Schema().HasTable(store.countryTableName) {
+		err := store.db.Schema().Drop(store.countryTableName)
+		if err != nil {
+			store.logger.Error("MigrateDown failed for country table", "error", err)
+			return err
 		}
 	}
 
@@ -148,23 +129,23 @@ func (store *storeImplementation) MigrateDown(ctx context.Context, tx ...*sql.Tx
 // Seed populates all tables with initial data
 func (store *storeImplementation) Seed(ctx context.Context, tx ...*sql.Tx) error {
 	// seed country table
-	err := store.seedCountriesIfTableIsEmpty()
+	err := store.seedCountriesIfTableIsEmpty(ctx)
 	if err != nil {
-		log.Println(err)
+		store.logger.Error("Seed failed for countries", "error", err)
 		return err
 	}
 
 	// seed state table
-	err = store.seedStatesIfTableEmpty()
+	err = store.seedStatesIfTableEmpty(ctx)
 	if err != nil {
-		log.Println(err)
+		store.logger.Error("Seed failed for states", "error", err)
 		return err
 	}
 
 	// seed timezone table
-	err = store.seedTimezonesIfTableEmpty()
+	err = store.seedTimezonesIfTableEmpty(ctx)
 	if err != nil {
-		log.Println(err)
+		store.logger.Error("Seed failed for timezones", "error", err)
 		return err
 	}
 
@@ -174,6 +155,13 @@ func (store *storeImplementation) Seed(ctx context.Context, tx ...*sql.Tx) error
 // EnableDebug - enables the debug option
 func (store *storeImplementation) EnableDebug(debug bool) {
 	store.debugEnabled = debug
+	if debug {
+		store.db.EnableDebug()
+		store.logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	} else {
+		store.db.DisableDebug()
+		store.logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	}
 }
 
 // GetCountryTableName returns the country table name
@@ -206,34 +194,20 @@ func (store *storeImplementation) SetTimezoneTableName(timezoneTableName string)
 	store.timezoneTableName = timezoneTableName
 }
 
+// == COUNTRY CRUD ==========================================================
+
 func (store *storeImplementation) CountryCreate(ctx context.Context, country *Country) error {
 	country.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 	country.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
-	data := country.Data()
+	data := store.countryToMap(country)
 
-	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-		Insert(store.countryTableName).
-		Prepared(true).
-		Rows(data).
-		ToSQL()
-
-	if errSql != nil {
-		return errSql
-	}
-
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
-
-	_, err := store.db.ExecContext(ctx, sqlStr, params...)
-
+	err := store.db.Query().Table(store.countryTableName).Create(data)
 	if err != nil {
 		return err
 	}
 
 	country.MarkAsNotDirty()
-
 	return nil
 }
 
@@ -250,21 +224,10 @@ func (store *storeImplementation) CountryDeleteByID(ctx context.Context, id stri
 		return errors.New("country id is empty")
 	}
 
-	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-		Delete(store.countryTableName).
-		Prepared(true).
-		Where(goqu.C(COLUMN_ID).Eq(id)).
-		ToSQL()
-
-	if errSql != nil {
-		return errSql
-	}
-
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
-
-	_, err := store.db.ExecContext(ctx, sqlStr, params...)
+	_, err := store.db.Query().
+		Table(store.countryTableName).
+		Where(COLUMN_ID+" = ?", id).
+		Delete()
 
 	return err
 }
@@ -329,25 +292,15 @@ func (store *storeImplementation) CountryNameFindByIso2(ctx context.Context, iso
 func (store *storeImplementation) CountryList(ctx context.Context, options CountryQueryOptions) ([]Country, error) {
 	q := store.countryQuery(options)
 
-	sqlStr, params, errSql := q.Select().ToSQL()
-
-	if errSql != nil {
-		return []Country{}, nil
-	}
-
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
-
-	modelMaps, err := database.SelectToMapString(database.NewQueryableContext(ctx, store.db), sqlStr, params...)
+	var results []map[string]any
+	err := q.Get(&results)
 	if err != nil {
 		return []Country{}, err
 	}
 
 	list := []Country{}
-
-	lo.ForEach(modelMaps, func(modelMap map[string]string, index int) {
-		model := NewCountryFromExistingData(modelMap)
+	lo.ForEach(results, func(result map[string]any, index int) {
+		model := store.mapToCountry(result)
 		list = append(list, *model)
 	})
 
@@ -359,7 +312,7 @@ func (store *storeImplementation) CountrySoftDelete(ctx context.Context, country
 		return errors.New("country is nil")
 	}
 
-	country.SetDeletedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+	country.SetSoftDeletedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
 	return store.CountryUpdate(ctx, country)
 }
@@ -379,168 +332,125 @@ func (store *storeImplementation) CountryUpdate(ctx context.Context, country *Co
 		return errors.New("country is nil")
 	}
 
-	// country.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString())
+	data := store.countryToMap(country)
+	delete(data, COLUMN_ID) // ID is not updatable
 
-	dataChanged := country.DataChanged()
-
-	delete(dataChanged, COLUMN_ID) // ID is not updatable
-	delete(dataChanged, "hash")    // Hash is not updatable
-	delete(dataChanged, "data")    // Data is not updatable
-
-	if len(dataChanged) < 1 {
-		return nil
-	}
-
-	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-		Update(store.countryTableName).
-		Prepared(true).
-		Set(dataChanged).
-		Where(goqu.C(COLUMN_ID).Eq(country.ID())).
-		ToSQL()
-
-	if errSql != nil {
-		return errSql
-	}
-
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
-
-	_, err := store.db.ExecContext(ctx, sqlStr, params...)
-
-	country.MarkAsNotDirty()
-
-	return err
-}
-
-func (store *storeImplementation) countryQuery(options CountryQueryOptions) *goqu.SelectDataset {
-	q := goqu.Dialect(store.dbDriverName).From(store.countryTableName)
-
-	if options.ID != "" {
-		q = q.Where(goqu.C(COLUMN_ID).Eq(options.ID))
-	}
-
-	if options.Status != "" {
-		q = q.Where(goqu.C(COLUMN_STATUS).Eq(options.Status))
-	}
-
-	if options.Iso2 != "" {
-		q = q.Where(goqu.C(COLUMN_ISO2_CODE).Eq(options.Iso2))
-	}
-
-	if options.Iso3 != "" {
-		q = q.Where(goqu.C(COLUMN_ISO3_CODE).Eq(options.Iso3))
-	}
-
-	if len(options.IDIn) > 0 {
-		q = q.Where(goqu.C(COLUMN_ID).In(options.IDIn))
-	}
-
-	if len(options.StatusIn) > 0 {
-		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
-	}
-
-	if options.CountOnly {
-		q = q.Select(goqu.COUNT("*"))
-	}
-
-	if options.Limit > 0 {
-		q = q.Limit(uint(options.Limit))
-	}
-
-	if options.Offset > 0 {
-		q = q.Offset(uint(options.Offset))
-	}
-
-	if options.OrderBy != "" {
-		if options.SortOrder == "desc" {
-			q = q.Order(goqu.C(options.OrderBy).Desc())
-		} else {
-			q = q.Order(goqu.C(options.OrderBy).Asc())
+	// Check if any meaningful field has changed
+	if country.originalData != nil {
+		hasChanges := false
+		for k, v := range data {
+			if k == COLUMN_ID || k == COLUMN_CREATED_AT || k == COLUMN_UPDATED_AT {
+				continue
+			}
+			if country.originalData[k] != v {
+				hasChanges = true
+				break
+			}
+		}
+		if !hasChanges {
+			return nil
 		}
 	}
 
-	if !options.WithDeleted {
-		q = q.Where(goqu.C(COLUMN_DELETED_AT).Eq(sb.NULL_DATETIME))
-	}
+	country.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+	data = store.countryToMap(country)
+	delete(data, COLUMN_ID) // ID is not updatable
 
-	return q
-}
-
-func (store *storeImplementation) StateCreate(state *State) error {
-	state.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
-	state.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
-
-	data := state.Data()
-
-	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-		Insert(store.stateTableName).
-		Prepared(true).
-		Rows(data).
-		ToSQL()
-
-	if errSql != nil {
-		return errSql
-	}
-
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
-
-	_, err := store.db.Exec(sqlStr, params...)
+	_, err := store.db.Query().
+		Table(store.countryTableName).
+		Where(COLUMN_ID+" = ?", country.ID()).
+		Update(data)
 
 	if err != nil {
 		return err
 	}
 
-	state.MarkAsNotDirty()
-
+	country.MarkAsNotDirty()
 	return nil
 }
 
-func (store *storeImplementation) StatesCreate(states []*State) error {
-	for index, state := range states {
-		state.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
-		state.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
-		states[index] = state
+func (store *storeImplementation) countryQuery(options CountryQueryOptions) contractsorm.Query {
+	q := store.db.Query().Table(store.countryTableName)
+
+	if options.ID != "" {
+		q = q.Where(COLUMN_ID+" = ?", options.ID)
 	}
 
-	const batchSize = 50
+	if options.Status != "" {
+		q = q.Where(COLUMN_STATUS+" = ?", options.Status)
+	}
 
-	for i := 0; i < len(states); i += batchSize {
-		end := min(i+batchSize, len(states))
+	if options.Iso2 != "" {
+		q = q.Where(COLUMN_ISO2_CODE+" = ?", options.Iso2)
+	}
 
-		batch := states[i:end]
-		rows := []map[string]string{}
+	if options.Iso3 != "" {
+		q = q.Where(COLUMN_ISO3_CODE+" = ?", options.Iso3)
+	}
 
-		for _, state := range batch {
-			data := state.Data()
-			rows = append(rows, data)
+	if len(options.IDIn) > 0 {
+		q = q.WhereIn(COLUMN_ID, lo.ToAnySlice(options.IDIn))
+	}
+
+	if len(options.StatusIn) > 0 {
+		q = q.WhereIn(COLUMN_STATUS, lo.ToAnySlice(options.StatusIn))
+	}
+
+	if options.Limit > 0 {
+		q = q.Limit(options.Limit)
+	}
+
+	if options.Offset > 0 {
+		q = q.Offset(options.Offset)
+	}
+
+	if options.OrderBy != "" {
+		direction := options.SortOrder
+		if direction == "" {
+			direction = "asc"
 		}
+		q = q.OrderBy(options.OrderBy, direction)
+	}
 
-		sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-			Insert(store.stateTableName).
-			Prepared(true).
-			Rows(rows).
-			ToSQL()
+	if !options.WithDeleted {
+		q = q.Where(COLUMN_SOFT_DELETED_AT+" = ?", MAX_DATETIME)
+	}
 
-		if errSql != nil {
-			return errSql
-		}
+	return q
+}
 
-		if store.debugEnabled {
-			log.Println(sqlStr)
-		}
+// == STATE CRUD ============================================================
 
-		_, err := store.db.Exec(sqlStr, params...)
+func (store *storeImplementation) StateCreate(ctx context.Context, state *State) error {
+	state.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+	state.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
+	data := store.stateToMap(state)
+
+	err := store.db.Query().Table(store.stateTableName).Create(data)
+	if err != nil {
+		return err
+	}
+
+	state.MarkAsNotDirty()
+	return nil
+}
+
+func (store *storeImplementation) StatesCreate(ctx context.Context, states []*State) error {
+	for _, state := range states {
+		state.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+		state.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+	}
+
+	for _, state := range states {
+		data := store.stateToMap(state)
+
+		err := store.db.Query().Table(store.stateTableName).Create(data)
 		if err != nil {
 			return err
 		}
 
-		for _, state := range batch {
-			state.MarkAsNotDirty()
-		}
+		state.MarkAsNotDirty()
 	}
 
 	return nil
@@ -549,182 +459,247 @@ func (store *storeImplementation) StatesCreate(states []*State) error {
 func (store *storeImplementation) StateList(ctx context.Context, options StateQueryOptions) ([]State, error) {
 	q := store.stateQuery(options)
 
-	sqlStr, params, errSql := q.Select().ToSQL()
-
-	if errSql != nil {
-		return []State{}, nil
-	}
-
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
-
-	modelMaps, err := database.SelectToMapString(database.NewQueryableContext(ctx, store.db), sqlStr, params...)
+	var results []map[string]any
+	err := q.Get(&results)
 	if err != nil {
 		return []State{}, err
 	}
 
 	list := []State{}
-
-	lo.ForEach(modelMaps, func(modelMap map[string]string, index int) {
-		model := NewStateFromExistingData(modelMap)
+	lo.ForEach(results, func(result map[string]any, index int) {
+		model := store.mapToState(result)
 		list = append(list, *model)
 	})
 
 	return list, nil
 }
 
-func (store *storeImplementation) stateQuery(options StateQueryOptions) *goqu.SelectDataset {
-	q := goqu.Dialect(store.dbDriverName).From(store.stateTableName)
+func (store *storeImplementation) stateQuery(options StateQueryOptions) contractsorm.Query {
+	q := store.db.Query().Table(store.stateTableName)
 
 	if options.ID != "" {
-		q = q.Where(goqu.C(COLUMN_ID).Eq(options.ID))
+		q = q.Where(COLUMN_ID+" = ?", options.ID)
 	}
 
 	if options.Status != "" {
-		q = q.Where(goqu.C(COLUMN_STATUS).Eq(options.Status))
+		q = q.Where(COLUMN_STATUS+" = ?", options.Status)
 	}
 
 	if options.CountryCode != "" {
-		q = q.Where(goqu.C(COLUMN_COUNTRY_CODE).Eq(options.CountryCode))
+		q = q.Where(COLUMN_COUNTRY_CODE+" = ?", options.CountryCode)
+	}
+
+	if options.StateCode != "" {
+		q = q.Where(COLUMN_STATE_CODE+" = ?", options.StateCode)
 	}
 
 	if len(options.StatusIn) > 0 {
-		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
-	}
-
-	if options.CountOnly {
-		q = q.Select(goqu.COUNT("*"))
+		q = q.WhereIn(COLUMN_STATUS, lo.ToAnySlice(options.StatusIn))
 	}
 
 	if options.Limit > 0 {
-		q = q.Limit(uint(options.Limit))
+		q = q.Limit(options.Limit)
 	}
 
 	if options.Offset > 0 {
-		q = q.Offset(uint(options.Offset))
+		q = q.Offset(options.Offset)
 	}
 
 	if options.OrderBy != "" {
-		if options.SortOrder == "desc" {
-			q = q.Order(goqu.C(options.OrderBy).Desc())
-		} else {
-			q = q.Order(goqu.C(options.OrderBy).Asc())
+		direction := options.SortOrder
+		if direction == "" {
+			direction = "asc"
 		}
+		q = q.OrderBy(options.OrderBy, direction)
 	}
 
 	if !options.WithDeleted {
-		q = q.Where(goqu.C(COLUMN_DELETED_AT).Eq(sb.NULL_DATETIME))
+		q = q.Where(COLUMN_SOFT_DELETED_AT+" = ?", MAX_DATETIME)
 	}
 
 	return q
 }
 
+// == TIMEZONE CRUD =========================================================
+
 func (store *storeImplementation) TimezoneCreate(ctx context.Context, timezone *Timezone) error {
 	timezone.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 	timezone.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
-	data := timezone.Data()
+	data := store.timezoneToMap(timezone)
 
-	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-		Insert(store.timezoneTableName).
-		Prepared(true).
-		Rows(data).
-		ToSQL()
-
-	if errSql != nil {
-		return errSql
-	}
-
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
-
-	_, err := store.db.ExecContext(ctx, sqlStr, params...)
-
+	err := store.db.Query().Table(store.timezoneTableName).Create(data)
 	if err != nil {
 		return err
 	}
 
 	timezone.MarkAsNotDirty()
-
 	return nil
 }
 
 func (store *storeImplementation) TimezoneList(ctx context.Context, options TimezoneQueryOptions) ([]Timezone, error) {
 	q := store.timezoneQuery(options)
 
-	sqlStr, params, errSql := q.Select().ToSQL()
-
-	if errSql != nil {
-		return []Timezone{}, nil
-	}
-
-	if store.debugEnabled {
-		log.Println(sqlStr)
-	}
-
-	modelMaps, err := database.SelectToMapString(database.NewQueryableContext(ctx, store.db), sqlStr, params...)
+	var results []map[string]any
+	err := q.Get(&results)
 	if err != nil {
 		return []Timezone{}, err
 	}
 
 	list := []Timezone{}
-
-	lo.ForEach(modelMaps, func(modelMap map[string]string, index int) {
-		model := NewTimezoneFromExistingData(modelMap)
+	lo.ForEach(results, func(result map[string]any, index int) {
+		model := store.mapToTimezone(result)
 		list = append(list, *model)
 	})
 
 	return list, nil
 }
 
-func (store *storeImplementation) timezoneQuery(options TimezoneQueryOptions) *goqu.SelectDataset {
-	q := goqu.Dialect(store.dbDriverName).From(store.timezoneTableName)
+func (store *storeImplementation) timezoneQuery(options TimezoneQueryOptions) contractsorm.Query {
+	q := store.db.Query().Table(store.timezoneTableName)
 
 	if options.ID != "" {
-		q = q.Where(goqu.C(COLUMN_ID).Eq(options.ID))
+		q = q.Where(COLUMN_ID+" = ?", options.ID)
 	}
 
 	if options.Status != "" {
-		q = q.Where(goqu.C(COLUMN_STATUS).Eq(options.Status))
+		q = q.Where(COLUMN_STATUS+" = ?", options.Status)
 	}
 
 	if options.CountryCode != "" {
-		q = q.Where(goqu.C(COLUMN_COUNTRY_CODE).Eq(options.CountryCode))
+		q = q.Where(COLUMN_COUNTRY_CODE+" = ?", options.CountryCode)
 	}
 
 	if options.Timezone != "" {
-		q = q.Where(goqu.C(COLUMN_TIMEZONE).Eq(options.Timezone))
+		q = q.Where(COLUMN_TIMEZONE+" = ?", options.Timezone)
 	}
 
 	if len(options.StatusIn) > 0 {
-		q = q.Where(goqu.C(COLUMN_STATUS).In(options.StatusIn))
-	}
-
-	if options.CountOnly {
-		q = q.Select(goqu.COUNT("*"))
+		q = q.WhereIn(COLUMN_STATUS, lo.ToAnySlice(options.StatusIn))
 	}
 
 	if options.Limit > 0 {
-		q = q.Limit(uint(options.Limit))
+		q = q.Limit(options.Limit)
 	}
 
 	if options.Offset > 0 {
-		q = q.Offset(uint(options.Offset))
+		q = q.Offset(options.Offset)
 	}
 
 	if options.OrderBy != "" {
-		if options.SortOrder == "desc" {
-			q = q.Order(goqu.C(options.OrderBy).Desc())
-		} else {
-			q = q.Order(goqu.C(options.OrderBy).Asc())
+		direction := options.SortOrder
+		if direction == "" {
+			direction = "asc"
 		}
+		q = q.OrderBy(options.OrderBy, direction)
 	}
 
 	if !options.WithDeleted {
-		q = q.Where(goqu.C(COLUMN_DELETED_AT).Eq(sb.NULL_DATETIME))
+		q = q.Where(COLUMN_SOFT_DELETED_AT+" = ?", MAX_DATETIME)
 	}
 
 	return q
+}
+
+// == HELPERS ===============================================================
+
+func (store *storeImplementation) countryToMap(country *Country) map[string]any {
+	return map[string]any{
+		COLUMN_ID:              country.ID(),
+		COLUMN_STATUS:          country.Status(),
+		COLUMN_ISO2_CODE:       country.IsoCode2(),
+		COLUMN_ISO3_CODE:       country.IsoCode3(),
+		COLUMN_NAME:            country.Name(),
+		COLUMN_CONTINENT:       country.Continent(),
+		COLUMN_PHONE_PREFIX:    country.PhonePrefix(),
+		COLUMN_CREATED_AT:      country.CreatedAt(),
+		COLUMN_UPDATED_AT:      country.UpdatedAt(),
+		COLUMN_SOFT_DELETED_AT: country.GetSoftDeletedAt(),
+	}
+}
+
+func (store *storeImplementation) stateToMap(state *State) map[string]any {
+	return map[string]any{
+		COLUMN_ID:              state.ID(),
+		COLUMN_STATUS:          state.Status(),
+		COLUMN_COUNTRY_CODE:    state.CountryCode(),
+		COLUMN_STATE_CODE:      state.StateCode(),
+		COLUMN_NAME:            state.Name(),
+		COLUMN_CREATED_AT:      state.CreatedAt(),
+		COLUMN_UPDATED_AT:      state.UpdatedAt(),
+		COLUMN_SOFT_DELETED_AT: state.GetSoftDeletedAt(),
+	}
+}
+
+func (store *storeImplementation) timezoneToMap(timezone *Timezone) map[string]any {
+	return map[string]any{
+		COLUMN_ID:              timezone.ID(),
+		COLUMN_STATUS:          timezone.Status(),
+		COLUMN_TIMEZONE:        timezone.Timezone(),
+		COLUMN_ZONE_NAME:       timezone.ZoneName(),
+		COLUMN_GLOBAL_NAME:     timezone.GlobalName(),
+		COLUMN_COUNTRY_CODE:    timezone.CountryCode(),
+		COLUMN_OFFSET:          timezone.Offset(),
+		COLUMN_CREATED_AT:      timezone.CreatedAt(),
+		COLUMN_UPDATED_AT:      timezone.UpdatedAt(),
+		COLUMN_SOFT_DELETED_AT: timezone.GetSoftDeletedAt(),
+	}
+}
+
+func (store *storeImplementation) mapToCountry(data map[string]any) *Country {
+	stringData := make(map[string]string)
+	for k, v := range data {
+		if v != nil {
+			stringData[k] = toString(v)
+		} else {
+			stringData[k] = ""
+		}
+	}
+	return NewCountryFromExistingData(stringData)
+}
+
+func (store *storeImplementation) mapToState(data map[string]any) *State {
+	stringData := make(map[string]string)
+	for k, v := range data {
+		if v != nil {
+			stringData[k] = toString(v)
+		} else {
+			stringData[k] = ""
+		}
+	}
+	return NewStateFromExistingData(stringData)
+}
+
+func (store *storeImplementation) mapToTimezone(data map[string]any) *Timezone {
+	stringData := make(map[string]string)
+	for k, v := range data {
+		if v != nil {
+			stringData[k] = toString(v)
+		} else {
+			stringData[k] = ""
+		}
+	}
+	return NewTimezoneFromExistingData(stringData)
+}
+
+func toString(v any) string {
+	switch val := v.(type) {
+	case string:
+		return val
+	case time.Time:
+		if val.IsZero() {
+			return ""
+		}
+		return carbon.CreateFromStdTime(val).ToDateTimeString()
+	case []byte:
+		return string(val)
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", val)
+	case float32, float64:
+		return fmt.Sprintf("%f", val)
+	case bool:
+		return fmt.Sprintf("%t", val)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
 }

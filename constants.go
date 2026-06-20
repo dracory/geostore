@@ -4,7 +4,7 @@ const COLUMN_CONTINENT = "continent"
 const COLUMN_COUNTRY_CODE = "country_code"
 const COLUMN_STATE_CODE = "state_code"
 const COLUMN_CREATED_AT = "created_at"
-const COLUMN_DELETED_AT = "deleted_at"
+const COLUMN_SOFT_DELETED_AT = "soft_deleted_at"
 const COLUMN_GLOBAL_NAME = "global_name"
 const COLUMN_ID = "id"
 const COLUMN_ISO2_CODE = "iso2_code"
@@ -25,3 +25,6 @@ const STATE_STATUS_INACTIVE = "inactive"
 
 const TIMEZONE_STATUS_ACTIVE = "active"
 const TIMEZONE_STATUS_INACTIVE = "inactive"
+
+// MAX_DATETIME is a far-future datetime used as the default soft-delete sentinel.
+const MAX_DATETIME = "9999-12-31 23:59:59"

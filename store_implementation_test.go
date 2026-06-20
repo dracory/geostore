@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dracory/sb"
 	_ "modernc.org/sqlite"
 )
 
@@ -141,8 +140,8 @@ func TestStoreCountryFindByID(t *testing.T) {
 		t.Fatal("Country iso_code3 MUST BE 'UNK', found: ", countryFound.IsoCode3())
 	}
 
-	if !strings.Contains(countryFound.DeletedAt(), sb.NULL_DATETIME) {
-		t.Fatal("Country MUST NOT be soft deleted", countryFound.DeletedAt())
+	if !strings.Contains(countryFound.GetSoftDeletedAt(), MAX_DATETIME) {
+		t.Fatal("Country MUST NOT be soft deleted", countryFound.GetSoftDeletedAt())
 	}
 }
 
@@ -187,7 +186,7 @@ func TestStoreCountrySoftDelete(t *testing.T) {
 		t.Fatal("unexpected error:", err)
 	}
 
-	if country.DeletedAt() != sb.NULL_DATETIME {
+	if country.GetSoftDeletedAt() != MAX_DATETIME {
 		t.Fatal("Country MUST NOT be soft deleted")
 	}
 
@@ -215,8 +214,8 @@ func TestStoreCountrySoftDelete(t *testing.T) {
 		t.Fatal("Exam MUST be soft deleted")
 	}
 
-	if strings.Contains(countryFindWithDeleted[0].DeletedAt(), sb.NULL_DATETIME) {
-		t.Fatal("Exam MUST be soft deleted", country.DeletedAt())
+	if strings.Contains(countryFindWithDeleted[0].GetSoftDeletedAt(), MAX_DATETIME) {
+		t.Fatal("Exam MUST be soft deleted", country.GetSoftDeletedAt())
 	}
 
 }
@@ -281,7 +280,7 @@ func TestStoreStateCreate(t *testing.T) {
 		SetName("Unknown").
 		SetStateCode("UN")
 
-	err = store.StateCreate(state)
+	err = store.StateCreate(context.Background(), state)
 
 	if err != nil {
 		t.Fatal("unexpected error:", err)
@@ -765,12 +764,12 @@ func TestStoreStateQueryOptions(t *testing.T) {
 		SetStateCode("IS").
 		SetCountryCode("CA")
 
-	err = store.StateCreate(state1)
+	err = store.StateCreate(context.Background(), state1)
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
 
-	err = store.StateCreate(state2)
+	err = store.StateCreate(context.Background(), state2)
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
@@ -840,7 +839,7 @@ func TestStoreStatesCreate(t *testing.T) {
 		NewState().SetStatus(COUNTRY_STATUS_ACTIVE).SetName("State3").SetStateCode("S3").SetCountryCode("CA"),
 	}
 
-	err = store.StatesCreate(states)
+	err = store.StatesCreate(context.Background(), states)
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}

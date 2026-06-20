@@ -22,10 +22,10 @@ type StoreInterface interface {
 	SetTimezoneTableName(timezoneTableName string)
 
 	// MigrateUp creates all database tables
-	MigrateDown(ctx context.Context, tx ...*sql.Tx) error
+	MigrateUp(ctx context.Context, tx ...*sql.Tx) error
 
 	// MigrateDown drops all database tables
-	MigrateUp(ctx context.Context, tx ...*sql.Tx) error
+	MigrateDown(ctx context.Context, tx ...*sql.Tx) error
 
 	// Seed populates all tables with initial data
 	Seed(ctx context.Context, tx ...*sql.Tx) error
@@ -38,12 +38,12 @@ type StoreInterface interface {
 	CountryFindByID(ctx context.Context, countryID string) (*Country, error)
 	CountryFindByIso2(ctx context.Context, iso2Code string) (*Country, error)
 	CountryList(ctx context.Context, options CountryQueryOptions) ([]Country, error)
-	CountrySoftDelete(ctx context.Context, discount *Country) error
-	CountrySoftDeleteByID(ctx context.Context, discountID string) error
+	CountrySoftDelete(ctx context.Context, country *Country) error
+	CountrySoftDeleteByID(ctx context.Context, countryID string) error
 	CountryUpdate(ctx context.Context, country *Country) error
 
-	StateCreate(state *State) error
-	StatesCreate(states []*State) error
+	StateCreate(ctx context.Context, state *State) error
+	StatesCreate(ctx context.Context, states []*State) error
 	StateList(ctx context.Context, options StateQueryOptions) ([]State, error)
 
 	TimezoneCreate(ctx context.Context, timezone *Timezone) error

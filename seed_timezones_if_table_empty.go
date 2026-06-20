@@ -2980,8 +2980,7 @@ var timezones = []map[string]string{
 	},
 }
 
-func (store *storeImplementation) seedTimezonesIfTableEmpty() error {
-	ctx := context.Background()
+func (store *storeImplementation) seedTimezonesIfTableEmpty(ctx context.Context) error {
 	list, err := store.TimezoneList(ctx, TimezoneQueryOptions{
 		Limit: 1,
 	})
@@ -3002,7 +3001,7 @@ func (store *storeImplementation) seedTimezonesIfTableEmpty() error {
 		timezone.SetGlobalName(entry["GlobalName"])
 		timezone.SetOffset(entry["GtmOffset"])
 
-		err = store.TimezoneCreate(context.Background(), timezone)
+		err = store.TimezoneCreate(ctx, timezone)
 
 		if err != nil {
 			return err

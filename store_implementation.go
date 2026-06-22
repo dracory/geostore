@@ -437,19 +437,31 @@ func (store *storeImplementation) StateCreate(ctx context.Context, state *State)
 }
 
 func (store *storeImplementation) StatesCreate(ctx context.Context, states []*State) error {
+	now := carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)
 	for _, state := range states {
-		state.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
-		state.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+		state.SetCreatedAt(now)
+		state.SetUpdatedAt(now)
 	}
 
-	for _, state := range states {
-		data := store.stateToMap(state)
+	data := make([]map[string]any, len(states))
+	for i, state := range states {
+		data[i] = store.stateToMap(state)
+	}
 
-		err := store.db.Query().Table(store.stateTableName).Create(data)
+	const batchSize = 100
+	for i := 0; i < len(data); i += batchSize {
+		end := i + batchSize
+		if end > len(data) {
+			end = len(data)
+		}
+
+		err := store.db.Query().Table(store.stateTableName).Create(data[i:end])
 		if err != nil {
 			return err
 		}
+	}
 
+	for _, state := range states {
 		state.MarkAsNotDirty()
 	}
 

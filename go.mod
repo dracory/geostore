@@ -3,7 +3,7 @@ module github.com/dracory/geostore
 go 1.26.3
 
 require (
-	github.com/dracory/neat v0.31.0
+	github.com/dracory/neat v0.33.0
 	github.com/dromara/carbon/v2 v2.6.16
 	github.com/samber/lo v1.53.0
 	modernc.org/sqlite v1.54.0
@@ -12,7 +12,7 @@ require (
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/mattn/go-isatty v0.0.23 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
@@ -20,6 +20,7 @@ require (
 	golang.org/x/exp v0.0.0-20260718201538-764159d718ef // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
+	modernc.org/gc/v3 v3.1.5 // indirect
 	modernc.org/libc v1.74.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect

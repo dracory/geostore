@@ -2,17 +2,17 @@ package geostore
 
 import (
 	"time"
+	"uuid"
 
 	"github.com/dracory/neat/database/orm"
 	"github.com/dracory/neat/database/soft_delete"
-	neatuid "github.com/dracory/neat/support/uid"
 	"github.com/dromara/carbon/v2"
 )
 
 // == CLASS =================================================================
 
 type Country struct {
-	orm.ShortID
+	orm.StringID
 
 	StatusField      string `db:"status"`
 	Iso2CodeField    string `db:"iso2_code"`
@@ -32,7 +32,7 @@ type Country struct {
 
 func NewCountry() *Country {
 	country := &Country{}
-	country.SetID(neatuid.GenerateShortID())
+	country.SetID(uuid.NewV7().String())
 	country.SetStatus(COUNTRY_STATUS_ACTIVE)
 	country.SetName("")
 	country.SetIsoCode2("")
@@ -183,11 +183,11 @@ func (o *Country) SetUpdatedAt(updatedAt string) *Country {
 }
 
 func (o *Country) ID() string {
-	return o.ShortID.ID
+	return o.StringID.ID
 }
 
 func (o *Country) SetID(id string) *Country {
-	o.ShortID.ID = id
+	o.StringID.ID = id
 	return o
 }
 

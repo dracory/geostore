@@ -2,17 +2,17 @@ package geostore
 
 import (
 	"time"
+	"uuid"
 
 	"github.com/dracory/neat/database/orm"
 	"github.com/dracory/neat/database/soft_delete"
-	neatuid "github.com/dracory/neat/support/uid"
 	"github.com/dromara/carbon/v2"
 )
 
 // == CLASS =================================================================
 
 type Timezone struct {
-	orm.ShortID
+	orm.StringID
 
 	StatusField      string `db:"status"`
 	TimezoneField    string `db:"timezone"`
@@ -32,7 +32,7 @@ type Timezone struct {
 
 func NewTimezone() *Timezone {
 	tz := &Timezone{}
-	tz.SetID(neatuid.GenerateShortID())
+	tz.SetID(uuid.NewV7().String())
 	tz.SetStatus(TIMEZONE_STATUS_ACTIVE)
 	tz.SetTimezone("")
 	tz.SetZoneName("")
@@ -183,11 +183,11 @@ func (o *Timezone) SetZoneName(zoneName string) *Timezone {
 }
 
 func (o *Timezone) ID() string {
-	return o.ShortID.ID
+	return o.StringID.ID
 }
 
 func (o *Timezone) SetID(id string) *Timezone {
-	o.ShortID.ID = id
+	o.StringID.ID = id
 	return o
 }
 

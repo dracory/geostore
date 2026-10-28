@@ -47,7 +47,7 @@ func (store *storeImplementation) MigrateUp(ctx context.Context, tx ...*sql.Tx) 
 	// create country table
 	if !store.db.Schema().HasTable(store.countryTableName) {
 		err := store.db.Schema().Create(store.countryTableName, func(table contractsschema.Blueprint) {
-			table.String(COLUMN_ID, 21)
+			table.String(COLUMN_ID, 40)
 			table.Primary(COLUMN_ID)
 			table.String(COLUMN_STATUS, 20)
 			table.String(COLUMN_ISO2_CODE, 2)
@@ -68,7 +68,7 @@ func (store *storeImplementation) MigrateUp(ctx context.Context, tx ...*sql.Tx) 
 	// create state table
 	if !store.db.Schema().HasTable(store.stateTableName) {
 		err := store.db.Schema().Create(store.stateTableName, func(table contractsschema.Blueprint) {
-			table.String(COLUMN_ID, 21)
+			table.String(COLUMN_ID, 40)
 			table.Primary(COLUMN_ID)
 			table.String(COLUMN_STATUS, 20)
 			table.String(COLUMN_COUNTRY_CODE, 2)
@@ -87,7 +87,7 @@ func (store *storeImplementation) MigrateUp(ctx context.Context, tx ...*sql.Tx) 
 	// create timezone table
 	if !store.db.Schema().HasTable(store.timezoneTableName) {
 		err := store.db.Schema().Create(store.timezoneTableName, func(table contractsschema.Blueprint) {
-			table.String(COLUMN_ID, 21)
+			table.String(COLUMN_ID, 40)
 			table.Primary(COLUMN_ID)
 			table.String(COLUMN_STATUS, 20)
 			table.String(COLUMN_TIMEZONE, 100)

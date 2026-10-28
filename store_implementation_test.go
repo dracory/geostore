@@ -1239,3 +1239,81 @@ func TestCountryList_CacheServesAndInvalidates(t *testing.T) {
 		t.Fatal("expected newly created country to be visible")
 	}
 }
+
+func TestMigrateUp_IDColumnLength(t *testing.T) {
+	db := initDB()
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		CountryTableName:   "test_id_length_country",
+		StateTableName:     "test_id_length_state",
+		TimezoneTableName:  "test_id_length_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
+	})
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	ctx := context.Background()
+	err = store.MigrateUp(ctx)
+	if err != nil {
+		t.Fatal("MigrateUp failed:", err)
+	}
+
+	// 36-char UUIDv7 string (e.g., 018f3a5b-7c12-7000-8000-000000000000)
+	country := NewCountry().
+		SetStatus(COUNTRY_STATUS_ACTIVE).
+		SetName("36CharIDCountry")
+	if len(country.ID()) != 36 {
+		t.Fatalf("expected country ID length 36, got %d (%s)", len(country.ID()), country.ID())
+	}
+	err = store.CountryCreate(ctx, country)
+	if err != nil {
+		t.Fatal("CountryCreate failed with 36-char ID:", err)
+	}
+
+	state := NewState().
+		SetStatus(COUNTRY_STATUS_ACTIVE).
+		SetName("36CharIDState").
+		SetStateCode("36")
+	if len(state.ID()) != 36 {
+		t.Fatalf("expected state ID length 36, got %d (%s)", len(state.ID()), state.ID())
+	}
+	err = store.StateCreate(ctx, state)
+	if err != nil {
+		t.Fatal("StateCreate failed with 36-char ID:", err)
+	}
+
+	timezone := NewTimezone().
+		SetStatus("active").
+		SetTimezone("Test/36CharID").
+		SetZoneName("Test").
+		SetGlobalName("Test Time").
+		SetCountryCode("TS").
+		SetOffset("+00:00")
+	if len(timezone.ID()) != 36 {
+		t.Fatalf("expected timezone ID length 36, got %d (%s)", len(timezone.ID()), timezone.ID())
+	}
+	err = store.TimezoneCreate(ctx, timezone)
+	if err != nil {
+		t.Fatal("TimezoneCreate failed with 36-char ID:", err)
+	}
+
+	// Verify retrieval
+	foundCountry, err := store.CountryFindByID(ctx, country.ID())
+	if err != nil || foundCountry == nil {
+		t.Fatal("failed to find country by 36-char ID:", err)
+	}
+
+	foundStates, err := store.StateList(ctx, StateQueryOptions{ID: state.ID()})
+	if err != nil || len(foundStates) != 1 {
+		t.Fatal("failed to find state by 36-char ID:", err)
+	}
+
+	foundTimezones, err := store.TimezoneList(ctx, TimezoneQueryOptions{ID: timezone.ID()})
+	if err != nil || len(foundTimezones) != 1 {
+		t.Fatal("failed to find timezone by 36-char ID:", err)
+	}
+}

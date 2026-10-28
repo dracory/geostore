@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/dracory/neat"
@@ -28,6 +30,16 @@ type storeImplementation struct {
 	autoseedEnabled    bool
 	debugEnabled       bool
 	logger             *slog.Logger
+
+	// countryCache holds an in-memory snapshot of the whole country table.
+	// Countries are seeded reference data (~250 rows) that change rarely,
+	// so lookups such as CountryFindByIso2 — which hot paths like the stats
+	// sessions page call once per visitor row — are served from memory
+	// instead of hitting the database every time. Any mutation through this
+	// store invalidates the snapshot.
+	countryCacheMu     sync.Mutex
+	countryCache       []Country
+	countryCacheLoaded bool
 }
 
 // MigrateUp creates all database tables
@@ -123,6 +135,7 @@ func (store *storeImplementation) MigrateDown(ctx context.Context, tx ...*sql.Tx
 		}
 	}
 
+	store.invalidateCountryCache()
 	return nil
 }
 
@@ -149,6 +162,9 @@ func (store *storeImplementation) Seed(ctx context.Context, tx ...*sql.Tx) error
 		return err
 	}
 
+	// seeders write rows directly, bypassing CountryCreate — drop the
+	// snapshot so it does not serve stale pre-seed data
+	store.invalidateCountryCache()
 	return nil
 }
 
@@ -172,6 +188,7 @@ func (store *storeImplementation) GetCountryTableName() string {
 // SetCountryTableName sets the country table name
 func (store *storeImplementation) SetCountryTableName(countryTableName string) {
 	store.countryTableName = countryTableName
+	store.invalidateCountryCache()
 }
 
 // GetStateTableName returns the state table name
@@ -207,6 +224,7 @@ func (store *storeImplementation) CountryCreate(ctx context.Context, country *Co
 		return err
 	}
 
+	store.invalidateCountryCache()
 	country.MarkAsNotDirty()
 	return nil
 }
@@ -229,7 +247,12 @@ func (store *storeImplementation) CountryDeleteByID(ctx context.Context, id stri
 		Where(COLUMN_ID+" = ?", id).
 		Delete()
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	store.invalidateCountryCache()
+	return nil
 }
 
 func (store *storeImplementation) CountryFindByID(ctx context.Context, id string) (*Country, error) {
@@ -290,21 +313,102 @@ func (store *storeImplementation) CountryNameFindByIso2(ctx context.Context, iso
 }
 
 func (store *storeImplementation) CountryList(ctx context.Context, options CountryQueryOptions) ([]Country, error) {
-	q := store.countryQuery(options)
-
-	var results []map[string]any
-	err := q.Get(&results)
+	countries, err := store.countriesAll(ctx)
 	if err != nil {
 		return []Country{}, err
 	}
 
-	list := []Country{}
-	lo.ForEach(results, func(result map[string]any, index int) {
-		model := store.mapToCountry(result)
-		list = append(list, *model)
-	})
+	list := make([]Country, 0, len(countries))
+	for _, country := range countries {
+		if !options.WithDeleted && country.GetSoftDeletedAt() != MAX_DATETIME {
+			continue
+		}
+		if options.ID != "" && country.ID() != options.ID {
+			continue
+		}
+		if options.Status != "" && country.Status() != options.Status {
+			continue
+		}
+		if options.Iso2 != "" && country.IsoCode2() != options.Iso2 {
+			continue
+		}
+		if options.Iso3 != "" && country.IsoCode3() != options.Iso3 {
+			continue
+		}
+		if len(options.IDIn) > 0 && !lo.Contains(options.IDIn, country.ID()) {
+			continue
+		}
+		if len(options.StatusIn) > 0 && !lo.Contains(options.StatusIn, country.Status()) {
+			continue
+		}
+		list = append(list, country)
+	}
+
+	if options.OrderBy != "" {
+		direction := options.SortOrder
+		if direction == "" {
+			direction = "asc"
+		}
+		sort.SliceStable(list, func(i, j int) bool {
+			vi := fmt.Sprintf("%v", store.countryToMap(&list[i])[options.OrderBy])
+			vj := fmt.Sprintf("%v", store.countryToMap(&list[j])[options.OrderBy])
+			if direction == "desc" {
+				return vi > vj
+			}
+			return vi < vj
+		})
+	}
+
+	if options.Offset > 0 {
+		if options.Offset >= len(list) {
+			return []Country{}, nil
+		}
+		list = list[options.Offset:]
+	}
+
+	if options.Limit > 0 && len(list) > options.Limit {
+		list = list[:options.Limit]
+	}
 
 	return list, nil
+}
+
+// countriesAll returns the full country table (including soft-deleted rows)
+// from an in-memory snapshot. The snapshot is loaded lazily on first use and
+// reused until any country mutation through this store invalidates it.
+func (store *storeImplementation) countriesAll(ctx context.Context) ([]Country, error) {
+	store.countryCacheMu.Lock()
+	defer store.countryCacheMu.Unlock()
+
+	if store.countryCacheLoaded {
+		return store.countryCache, nil
+	}
+
+	q := store.countryQuery(CountryQueryOptions{WithDeleted: true})
+
+	var results []map[string]any
+	err := q.Get(&results)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]Country, 0, len(results))
+	for _, result := range results {
+		list = append(list, *store.mapToCountry(result))
+	}
+
+	store.countryCache = list
+	store.countryCacheLoaded = true
+	return store.countryCache, nil
+}
+
+// invalidateCountryCache drops the in-memory country snapshot so the next
+// read reloads it from the database.
+func (store *storeImplementation) invalidateCountryCache() {
+	store.countryCacheMu.Lock()
+	defer store.countryCacheMu.Unlock()
+	store.countryCache = nil
+	store.countryCacheLoaded = false
 }
 
 func (store *storeImplementation) CountrySoftDelete(ctx context.Context, country *Country) error {
@@ -365,6 +469,7 @@ func (store *storeImplementation) CountryUpdate(ctx context.Context, country *Co
 		return err
 	}
 
+	store.invalidateCountryCache()
 	country.MarkAsNotDirty()
 	return nil
 }

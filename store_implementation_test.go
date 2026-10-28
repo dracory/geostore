@@ -1157,3 +1157,85 @@ func TestStoreAutoMigrateBackwardCompatibility(t *testing.T) {
 		t.Fatal("states should be seeded after AutoMigrate")
 	}
 }
+
+func TestCountryList_CacheServesAndInvalidates(t *testing.T) {
+	db := initDB()
+
+	store, err := NewStore(NewStoreOptions{
+		DB:                 db,
+		CountryTableName:   "test_country_cache",
+		StateTableName:     "test_country_cache_state",
+		TimezoneTableName:  "test_country_cache_timezone",
+		AutomigrateEnabled: false,
+		AutoseedEnabled:    false,
+	})
+
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if store == nil {
+		t.Fatal("unexpected nil store")
+	}
+
+	setupTestDB(t, store, true)
+	ctx := context.Background()
+
+	// warm the cache
+	country, err := store.CountryFindByIso2(ctx, "US")
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if country == nil {
+		t.Fatal("expected seeded US country")
+	}
+
+	// update must invalidate the snapshot
+	country.SetName("United States of America")
+	if err := store.CountryUpdate(ctx, country); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	updated, err := store.CountryFindByIso2(ctx, "US")
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if updated == nil || updated.Name() != "United States of America" {
+		t.Fatal("expected updated name after CountryUpdate")
+	}
+
+	// soft delete must invalidate and hide the row from default queries
+	if err := store.CountrySoftDelete(ctx, updated); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	deleted, err := store.CountryFindByIso2(ctx, "US")
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if deleted != nil {
+		t.Fatal("expected soft-deleted country to be hidden")
+	}
+	withDeleted, err := store.CountryList(ctx, CountryQueryOptions{Iso2: "US", WithDeleted: true})
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if len(withDeleted) != 1 {
+		t.Fatal("expected soft-deleted country with WithDeleted option")
+	}
+
+	// create must invalidate the snapshot
+	newCountry := NewCountry()
+	newCountry.SetIsoCode2("XX")
+	newCountry.SetIsoCode3("XXX")
+	newCountry.SetName("Testland")
+	newCountry.SetStatus(COUNTRY_STATUS_ACTIVE)
+	if err := store.CountryCreate(ctx, newCountry); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	created, err := store.CountryFindByIso2(ctx, "XX")
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if created == nil || created.Name() != "Testland" {
+		t.Fatal("expected newly created country to be visible")
+	}
+}
